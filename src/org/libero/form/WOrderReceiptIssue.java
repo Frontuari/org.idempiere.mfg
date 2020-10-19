@@ -948,7 +948,7 @@ ValueChangeListener,Serializable,WTableModelListener
 					{
 						// Added by Jorge Colmenarez 2020-02-24 18:55, create production document
 						try {
-							createProduction(order,issue,getM_Locator_ID(),getToDeliverQty(),trxName);
+							createProduction(order,issue,getM_Locator_ID(),getToDeliverQty(),trxName, getM_AttributeSetInstance_ID(), getScrapQty());
 							if (isCloseDocument)
 							{
 								order.setDateFinish(getMovementDate());

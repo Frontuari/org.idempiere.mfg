@@ -353,6 +353,8 @@ public class FTUMProductionLine extends MProductionLine {
 				setIsEndProduct(false);
 		}
 		
+		
+		
 		if ( isEndProduct() && getM_AttributeSetInstance_ID() != 0 )
 		{
 			String where = "M_QualityTest_ID IN (SELECT M_QualityTest_ID " +
@@ -369,12 +371,29 @@ public class FTUMProductionLine extends MProductionLine {
 			}
 		}
 		
-		if ( !isEndProduct() )
-		{
-			setMovementQty(getQtyUsed().negate());
+		if(getIsDerivative(getM_Product_ID()) == 1) {
+			setIsEndProduct(true);
 		}
 		
+		/*if ( !isEndProduct() )
+		{
+			setMovementQty(getQtyUsed().negate());
+		}*/
+		
+		
 		return true;
+	}
+	
+	public int getIsDerivative(int PP_Product_ID) {
+		int PP_Product_BOM_ID = 0;
+		
+		MProduction mp = new MProduction(getCtx(), getM_Production_ID(), null);
+		PP_Product_BOM_ID = mp.get_ValueAsInt("PP_Product_BOM_ID");
+		
+		String sql = "SELECT (CASE WHEN IsDerivative = 'Y' THEN 1 ELSE 0 END) IsDerivative FROM PP_Product_BOMLine\n" + 
+				"WHERE PP_Product_BOM_ID="+PP_Product_BOM_ID+" and m_product_id = "+PP_Product_ID;
+		
+		return DB.getSQLValueEx(get_TrxName(), sql);
 	}
 	
 }

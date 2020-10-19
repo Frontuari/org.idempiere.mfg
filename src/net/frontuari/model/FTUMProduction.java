@@ -1,6 +1,7 @@
 package net.frontuari.model;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -11,17 +12,23 @@ import java.util.Properties;
 import java.util.logging.Level;
 
 import org.adempiere.exceptions.AdempiereException;
+import org.adempiere.exceptions.PeriodClosedException;
 import org.compiere.acct.Doc;
 import org.compiere.model.I_M_ProductionPlan;
 import org.compiere.model.MAcctSchema;
+import org.compiere.model.MAttributeSetInstance;
 import org.compiere.model.MClient;
 import org.compiere.model.MDocType;
+import org.compiere.model.MLocator;
 import org.compiere.model.MPeriod;
 import org.compiere.model.MProduct;
+import org.compiere.model.MProductCategory;
 import org.compiere.model.MProduction;
 import org.compiere.model.MProductionLineMA;
 import org.compiere.model.MProductionPlan;
+import org.compiere.model.MStorageOnHand;
 import org.compiere.model.MSysConfig;
+import org.compiere.model.MUOMConversion;
 import org.compiere.model.ModelValidationEngine;
 import org.compiere.model.ModelValidator;
 import org.compiere.model.PO;
@@ -457,6 +464,326 @@ public class FTUMProduction extends MProduction {
 		FTUMProductionLine[] retValue = new FTUMProductionLine[list.size()];
 		list.toArray(retValue);
 		return retValue;
+	}
+	
+	@Override
+	public boolean voidIt() {
+		if (log.isLoggable(Level.INFO)) log.info(toString());
+		// Before Void
+		m_processMsg = ModelValidationEngine.get().fireDocValidate(this,ModelValidator.TIMING_BEFORE_VOID);
+		if (m_processMsg != null)
+			return false;
+
+		if (DOCSTATUS_Closed.equals(getDocStatus())
+				|| DOCSTATUS_Reversed.equals(getDocStatus())
+				|| DOCSTATUS_Voided.equals(getDocStatus()))
+		{
+			m_processMsg = "Document Closed: " + getDocStatus();
+			setDocAction(DOCACTION_None);
+			return false;
+		}
+
+		// Not Processed
+		if (DOCSTATUS_Drafted.equals(getDocStatus())
+				|| DOCSTATUS_Invalid.equals(getDocStatus())
+				|| DOCSTATUS_InProgress.equals(getDocStatus())
+				|| DOCSTATUS_Approved.equals(getDocStatus())
+				|| DOCSTATUS_NotApproved.equals(getDocStatus()) )
+		{
+			setIsCreated("N");
+			if (!isUseProductionPlan()) {
+				deleteLines(get_TrxName());
+				setProductionQty(BigDecimal.ZERO);
+			} else {
+				Query planQuery = new Query(Env.getCtx(), I_M_ProductionPlan.Table_Name, "M_ProductionPlan.M_Production_ID=?", get_TrxName());
+				List<MProductionPlan> plans = planQuery.setParameters(getM_Production_ID()).list();
+				for(MProductionPlan plan : plans) {
+					plan.deleteLines(get_TrxName());
+					plan.setProductionQty(BigDecimal.ZERO);
+					plan.setProcessed(true);
+					plan.saveEx();
+				}
+			}
+		}
+		else
+		{
+			boolean accrual = false;
+			try 
+			{
+				MPeriod.testPeriodOpen(getCtx(), getMovementDate(), Doc.DOCTYPE_MatProduction, getAD_Org_ID());
+			}
+			catch (PeriodClosedException e) 
+			{
+				accrual = true;
+			}
+
+			if (accrual)
+				return reverseAccrualIt();
+			else
+				return reverseCorrectIt();
+		}
+
+		// After Void
+		m_processMsg = ModelValidationEngine.get().fireDocValidate(this,ModelValidator.TIMING_AFTER_VOID);
+		if (m_processMsg != null)
+			return false;
+
+		setProcessed(true);
+		setDocAction(DOCACTION_None);
+		return true; 
+	}
+	
+	public int createProductionLines(boolean mustBeStocked,int PP_Product_BOM_ID) {
+		
+		set_ValueOfColumn("PP_Product_BOM_ID", PP_Product_BOM_ID);
+		lineno = 10;
+
+		count = 0;
+
+		int C_UOM_ID = get_ValueAsInt("C_UOM_ID");
+		
+		BigDecimal ProductionQty = getProductionQty();
+		
+		
+		// product to be produced
+		MProduct finishedProduct = new MProduct(getCtx(), getM_Product_ID(), get_TrxName());
+		
+		if(finishedProduct.getC_UOM_ID()!=C_UOM_ID) {
+			ProductionQty = MUOMConversion.convertProductTo(getCtx(), finishedProduct.get_ID(), C_UOM_ID, ProductionQty);
+			if(ProductionQty.signum()==0)
+				throw new AdempiereException("El producto "+finishedProduct.getValue()+"-"+finishedProduct.getName()+" no tiene conversion de unidades de medida");
+		}
+		
+
+		FTUMProductionLine line = new FTUMProductionLine( this );
+		line.setLine( lineno );
+		line.setM_Product_ID( finishedProduct.get_ID() );
+		line.setM_Locator_ID( getM_Locator_ID() );
+		line.setMovementQty(ProductionQty);
+		line.setPlannedQty(ProductionQty);
+		if(C_UOM_ID>0)
+			line.set_ValueOfColumn("C_UOM_ID", C_UOM_ID);
+		
+		line.saveEx(get_TrxName());
+		count++;
+		
+		createProductionLines(mustBeStocked, finishedProduct, PP_Product_BOM_ID, ProductionQty);
+		
+		return count;
+	}
+	
+public int createProductionLines(boolean mustBeStocked, MProduct finishedProduct, int PP_Product_BOM_ID, BigDecimal requiredQty) {
+		
+		int defaultLocator = 0;
+		
+		MLocator finishedLocator = MLocator.get(getCtx(), getM_Locator_ID());
+		
+		int M_Warehouse_ID = finishedLocator.getM_Warehouse_ID();
+		
+		int asi = 0;
+
+		// products used in production
+		String sql = "SELECT M_Product_ID, QtyBOM, C_UOM_ID,IsQtyPercentage, IsDerivative" + " FROM PP_Product_BOMLine"
+				+ " WHERE PP_Product_BOM_ID=" + PP_Product_BOM_ID + " ORDER BY Line";
+
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+
+		try {
+			pstmt = DB.prepareStatement(sql, get_TrxName());
+
+			rs = pstmt.executeQuery();
+			while (rs.next()) {
+				
+				lineno = lineno + 10;
+				int BOMProduct_ID = rs.getInt(1);
+				BigDecimal BOMQty = rs.getBigDecimal(2);
+				int C_UOM_ID = rs.getInt(3);
+				boolean isQtyPercentage = rs.getBoolean("IsQtyPercentage");
+				boolean IsDerivative = rs.getBoolean("IsDerivative");
+				
+				if(isQtyPercentage)
+					BOMQty= BOMQty.divide(new BigDecimal(100),2, RoundingMode.HALF_UP);
+				
+				BigDecimal BOMMovementQty = BOMQty.multiply(requiredQty);
+				
+				MProduct bomproduct = new MProduct(Env.getCtx(), BOMProduct_ID, get_TrxName());
+				
+
+				if ( bomproduct.isBOM() && bomproduct.isPhantom() )
+				{
+					createLines(mustBeStocked, bomproduct, BOMMovementQty);
+				}
+				else
+				{
+
+					defaultLocator = bomproduct.getM_Locator_ID();
+					if ( defaultLocator == 0 )
+						defaultLocator = getM_Locator_ID();
+
+					if (!bomproduct.isStocked())
+					{					
+						FTUMProductionLine BOMLine = null;
+						BOMLine = new FTUMProductionLine( this );
+						BOMLine.setLine( lineno );
+						BOMLine.setM_Product_ID( BOMProduct_ID );
+						BOMLine.setM_Locator_ID( defaultLocator );  
+						BOMLine.setQtyUsed(BOMMovementQty );
+						BOMLine.setPlannedQty( BOMMovementQty );
+						if(C_UOM_ID>0)
+							BOMLine.set_ValueOfColumn("C_UOM_ID", C_UOM_ID);
+						BOMLine.saveEx(get_TrxName());
+
+						lineno = lineno + 10;
+						count++;					
+					}
+					else if (BOMMovementQty.signum() == 0) 
+					{
+						FTUMProductionLine BOMLine = null;
+						BOMLine = new FTUMProductionLine( this );
+						BOMLine.setLine( lineno );
+						BOMLine.setM_Product_ID( BOMProduct_ID );
+						BOMLine.setM_Locator_ID( defaultLocator );  
+						BOMLine.setQtyUsed( BOMMovementQty );
+						BOMLine.setPlannedQty( BOMMovementQty );
+						if(C_UOM_ID>0)
+							BOMLine.set_ValueOfColumn("C_UOM_ID", C_UOM_ID);
+						BOMLine.saveEx(get_TrxName());
+
+						lineno = lineno + 10;
+						count++;
+					}
+					else
+					{
+
+						// BOM stock info
+						MStorageOnHand[] storages = null;
+						MProduct usedProduct = MProduct.get(getCtx(), BOMProduct_ID);
+						defaultLocator = usedProduct.getM_Locator_ID();
+						if ( defaultLocator == 0 )
+							defaultLocator = getM_Locator_ID();
+						if (usedProduct == null || usedProduct.get_ID() == 0)
+							return 0;
+
+						MClient client = MClient.get(getCtx());
+						MProductCategory pc = MProductCategory.get(getCtx(),
+								usedProduct.getM_Product_Category_ID());
+						String MMPolicy = pc.getMMPolicy();
+						if (MMPolicy == null || MMPolicy.length() == 0) 
+						{ 
+							MMPolicy = client.getMMPolicy();
+						}
+
+						storages = MStorageOnHand.getWarehouse(getCtx(), M_Warehouse_ID, BOMProduct_ID, 0, null,
+								MProductCategory.MMPOLICY_FiFo.equals(MMPolicy), true, 0, get_TrxName());
+
+						FTUMProductionLine BOMLine = null;
+						int prevLoc = -1;
+						int previousAttribSet = -1;
+						// Create lines from storage until qty is reached
+						for (int sl = 0; sl < storages.length; sl++) {
+
+							BigDecimal lineQty = storages[sl].getQtyOnHand();
+							if (lineQty.signum() != 0) {
+								if (lineQty.compareTo(BOMMovementQty) > 0)
+									lineQty = BOMMovementQty;
+
+
+								int loc = storages[sl].getM_Locator_ID();
+								int slASI = storages[sl].getM_AttributeSetInstance_ID();
+								int locAttribSet = new MAttributeSetInstance(getCtx(), asi,
+										get_TrxName()).getM_AttributeSet_ID();
+
+								// roll up costing attributes if in the same locator
+								if (locAttribSet == 0 && previousAttribSet == 0
+										&& prevLoc == loc) {
+									BOMLine.setQtyUsed(BOMLine.getQtyUsed()
+											.add(lineQty));
+									BOMLine.setPlannedQty(BOMLine.getQtyUsed());
+									BOMLine.saveEx(get_TrxName());
+
+								}
+								// otherwise create new line
+								else {
+									BOMLine = new FTUMProductionLine( this );
+									BOMLine.setLine( lineno );
+									BOMLine.setM_Product_ID( BOMProduct_ID );
+									BOMLine.setM_Locator_ID( loc );
+									BOMLine.setQtyUsed( lineQty);
+									BOMLine.setPlannedQty( lineQty);
+									if ( slASI != 0 && locAttribSet != 0 )  // ie non costing attribute
+										BOMLine.setM_AttributeSetInstance_ID(slASI);
+									if(C_UOM_ID>0)
+										BOMLine.set_ValueOfColumn("C_UOM_ID", C_UOM_ID);
+									BOMLine.saveEx(get_TrxName());
+
+									lineno = lineno + 10;
+									count++;
+								}
+								prevLoc = loc;
+								previousAttribSet = locAttribSet;
+								// enough ?
+								BOMMovementQty = BOMMovementQty.subtract(lineQty);
+								if (BOMMovementQty.signum() == 0)
+									break;
+							}
+						} // for available storages
+
+						// fallback
+						if (BOMMovementQty.signum() != 0 ) {
+							if (!mustBeStocked)
+							{
+
+								// roll up costing attributes if in the same locator
+								if ( previousAttribSet == 0
+										&& prevLoc == defaultLocator) {
+									BOMLine.setQtyUsed(BOMLine.getQtyUsed()
+											.add(BOMMovementQty));
+									BOMLine.setPlannedQty(BOMLine.getQtyUsed());
+									BOMLine.saveEx(get_TrxName());
+
+								}
+								// otherwise create new line
+								else {
+
+									BOMLine = new FTUMProductionLine( this );
+									BOMLine.setLine( lineno );
+									BOMLine.setM_Product_ID( BOMProduct_ID );
+									BOMLine.setM_Locator_ID( defaultLocator );  
+									if(IsDerivative) {
+										BOMLine.setMovementQty(BOMMovementQty);
+									}else {
+										BOMLine.setQtyUsed( BOMMovementQty);
+									}
+									
+									BOMLine.setPlannedQty( BOMMovementQty);
+									
+									if(C_UOM_ID>0)
+										BOMLine.set_ValueOfColumn("C_UOM_ID", C_UOM_ID);
+									BOMLine.saveEx(get_TrxName());
+
+									lineno = lineno + 10;
+									count++;
+								}
+
+							}
+							else
+							{
+								throw new AdempiereUserError("Not enough stock of " + BOMProduct_ID);
+							}
+						}
+					}
+				}
+			} // for all bom products
+		} catch (Exception e) {
+			throw new AdempiereException("Failed to create production lines", e);
+		}
+		finally {
+			DB.close(rs, pstmt);
+		}
+
+		return count;
+	
 	}
 	
 }

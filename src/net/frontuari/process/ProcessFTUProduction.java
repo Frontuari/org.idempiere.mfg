@@ -14,7 +14,7 @@ public class ProcessFTUProduction extends SvrProcess {
 
 	@Override
 	protected void prepare() {
-		System.out.println("Hola");
+		
 	}
 
 	@Override
@@ -31,7 +31,7 @@ public class ProcessFTUProduction extends SvrProcess {
 			try {
 				if(production.processIt(production.getDocAction())) {
 					production.saveEx(get_TrxName());
-					if(production.getDocStatus().equals(MProduction.DOCSTATUS_Reversed))
+					if(production.getDocStatus().equals(MProduction.DOCSTATUS_Reversed) || production.getDocStatus().equals(MProduction.DOCSTATUS_Voided))
 					{
 						MPPOrder order = new MPPOrder(getCtx(), PPOrderID, get_TrxName());
 						order.setDocStatus(MPPOrder.DOCSTATUS_Completed);

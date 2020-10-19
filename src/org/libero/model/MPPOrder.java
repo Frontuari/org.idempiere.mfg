@@ -899,10 +899,10 @@ public class MPPOrder extends X_PP_Order implements DocAction
 			setDocAction(MPPOrder.ACTION_None);
 		}
 		
-		if(!isDelivered())
+		/*if(!isDelivered())
 		{
 			throw new AdempiereException("Cannot close this document because do not exist transactions"); // 
-		}
+		}*/
 			
 		createVariances();
 		

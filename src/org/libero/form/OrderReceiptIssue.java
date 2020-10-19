@@ -24,6 +24,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.List;
 
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.exceptions.DBException;
@@ -90,6 +91,8 @@ public class OrderReceiptIssue extends GenForm {
 	private MPPOrder m_PP_order = null;
 	
 	private boolean m_isOnlyProduction = false;
+	
+	public List<Integer> selectedItems;
 
 	public void configureMiniTable(IMiniTable issue) {
 		issue.addColumn(MPPOrderBOMLine.COLUMNNAME_PP_Order_BOMLine_ID); // 0
@@ -390,6 +393,7 @@ public class OrderReceiptIssue extends GenForm {
 				// set values
 				// issue.
 				IDColumn id = new IDColumn(rs.getInt(1));
+				
 				BigDecimal qtyBom = rs.getBigDecimal(15);
 				Boolean isQtyPercentage = rs.getString(16).equals("Y");
 				Boolean isCritical = rs.getString(2).equals("Y");
@@ -406,8 +410,6 @@ public class OrderReceiptIssue extends GenForm {
 				BigDecimal componentScrapQty = Env.ZERO;
 				BigDecimal componentQtyReq = Env.ZERO;
 				BigDecimal componentQtyToDel = Env.ZERO;
-
-				id.setSelected(isOnlyReceipt());
 
 				issue.setValueAt(id, row, 0); // PP_OrderBOMLine_ID
 				issue.setValueAt(isCritical, row, 1); // IsCritical
@@ -976,7 +978,7 @@ public class OrderReceiptIssue extends GenForm {
 	public void showMessage(String message, boolean error) {
 	}
 	
-	public void createProduction(MPPOrder order, IMiniTable issue, int LocatorID, BigDecimal qty, String trxName)
+	public void createProduction(MPPOrder order, IMiniTable issue, int LocatorID, BigDecimal qty, String trxName, int AttributeSetInstance_ID, BigDecimal ScrapQty)
 	{
 		// Create the production
 		FTUMProduction production = new FTUMProduction(Env.getCtx(), 0, trxName);
@@ -1009,6 +1011,9 @@ public class OrderReceiptIssue extends GenForm {
 		 mpl1.setPlannedQty(order.getQtyEntered());
 		 mpl1.setMovementQty(qty);
 		 mpl1.setM_Locator_ID(LocatorID);
+		
+		 mpl1.set_ValueOfColumn("M_AttributeSetInstance_ID", AttributeSetInstance_ID);
+		 mpl1.set_ValueOfColumn("ScrappedQty", ScrapQty);
 		 
 		 mpl1.saveEx(trxName);
 		 
@@ -1057,7 +1062,8 @@ public class OrderReceiptIssue extends GenForm {
 				 mpl.setM_Product_ID(productID);
 				 mpl.setM_Locator_ID(locatorID);
 				 mpl.setPlannedQty(lines[0].getQtyRequired());
-				 //mpl.set_ValueOfColumn("ScrappedQty",getScrapQty() );
+				 System.out.println(m_issue[i][0].get(5));
+				 mpl.set_ValueOfColumn("ScrappedQty",m_issue[i][0].get(5));
 				 if(lines[0].get_ValueAsBoolean("IsDerivative")) {
 					 mpl.setIsEndProduct(true);
 					 mpl.setMovementQty(qtyLine);
@@ -1065,6 +1071,7 @@ public class OrderReceiptIssue extends GenForm {
 					 mpl.setIsEndProduct(false);
 					 mpl.setQtyUsed(qtyLine);
 				 }
+				
 				 mpl.saveEx(trxName);
 				 
 				 lineNumber = lineNumber + 10;
