@@ -94,7 +94,7 @@ public class MPPMRP extends X_PP_MRP implements DocAction
         if (!product.isBOM())
             return 0;
         //<stevenyanzhi@gmail.com>
-        
+        return 0;/*
 		final String whereClause = MPPProductBOM.COLUMNNAME_BOMType+" IN (?,?)"
 					   +" AND "+MPPProductBOM.COLUMNNAME_BOMUse+"=?"
 					   +" AND "+MPPProductBOM.COLUMNNAME_Value+"=?";
@@ -141,7 +141,7 @@ public class MPPMRP extends X_PP_MRP implements DocAction
 					&& !MPPProductBOM.BOMTYPE_Make_To_Kit.equals(bom.getBOMType()) )
 				{
 					/*FERRY 12.12.2015
-					* If BOM Type is current active not need to create MO */
+					* If BOM Type is current active not need to create MO 
 					if ( MPPProductBOM.BOMTYPE_CurrentActive.equals(bom.getBOMType()) )
 						  return pp.getS_Resource_ID();//FERRY --end --red1-- returns Resource_ID to PP_MRP record.
 					throw new AdempiereException("@NotFound@ @PP_ProductBOM_ID@");
@@ -243,7 +243,7 @@ public class MPPMRP extends X_PP_MRP implements DocAction
 			*/
 			//<--Ferry
 			
-			if (plant_id > 0 && workflow != null)
+			/*if (plant_id > 0 && workflow != null)
 			{
 				String description = Msg.translate(ol.getCtx(),MRefList.getListName(ol.getCtx(), MPPOrderBOM.BOMTYPE_AD_Reference_ID, bom.getBOMType())) 
 				+ " "
@@ -313,7 +313,7 @@ public class MPPMRP extends X_PP_MRP implements DocAction
 				}
 			}    
 		}    
-	return 0;
+	return 0;*/
 	}
 	
 	/**
