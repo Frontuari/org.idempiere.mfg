@@ -33,9 +33,6 @@ public class CalloutMProductionLine implements IColumnCallout {
 		BigDecimal qtyUsed = Optional.ofNullable((BigDecimal) value)
 				.orElse(BigDecimal.ZERO);
 		
-		if (BigDecimal.ZERO.compareTo(qtyUsed) == 0)
-			return null;
-		
 		mTab.setValue(X_M_ProductionLine.COLUMNNAME_MovementQty, qtyUsed.negate());
 		
 		return null;
