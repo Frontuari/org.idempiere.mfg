@@ -85,7 +85,8 @@ public class FTUMProductionLine extends MProductionLine {
 		
 		if (log.isLoggable(Level.FINEST))	log.log(Level.FINEST, "asi Description is: " + asiString);
 		// create transactions for finished goods
-		if ( getM_Product_ID() == getEndProduct_ID()) {
+		if ( getM_Product_ID() == getEndProduct_ID()
+				|| isEndProduct()) {
 			if (reversalId <= 0  && isAutoGenerateLot && getM_AttributeSetInstance_ID() == 0)
 			{
 				asi = MAttributeSetInstance.generateLot(getCtx(), (MProduct)getM_Product(), get_TrxName());
@@ -132,6 +133,7 @@ public class FTUMProductionLine extends MProductionLine {
 		
 		MProductionLineMA lineMA = null;
 		MTransaction matTrx = null;
+		
 		BigDecimal qtyToMove = getMovementQty().negate();
 
 		if (qtyToMove.signum() > 0) {
@@ -276,7 +278,7 @@ public class FTUMProductionLine extends MProductionLine {
 						if (log.isLoggable(Level.FINE))log.log(Level.FINE, "Saved MA for " + toString());
 					}
 					matTrx = new MTransaction (getCtx(), getAD_Org_ID(), 
-							"P-", 
+							lineQty.signum() > 0 ? "P-" : "P+", 
 							getM_Locator_ID(), getM_Product_ID(), asi.get_ID(), 
 							lineQty.negate(), date, get_TrxName());
 					matTrx.setM_ProductionLine_ID(get_ID());
