@@ -783,6 +783,8 @@ public class FTUMProduction extends MProduction {
 						&& prevLoc == defaultLocator) {
 					BOMLine.setQtyUsed(BOMLine.getQtyUsed()
 							.add(BOMMovementQty));
+					BOMLine.setMovementQty(BOMLine.getMovementQty()
+							.add(BOMMovementQty.negate()));
 					BOMLine.setPlannedQty(BOMLine.getQtyUsed());
 					BOMLine.saveEx(get_TrxName());
 
@@ -795,6 +797,7 @@ public class FTUMProduction extends MProduction {
 					BOMLine.setM_Product_ID( BOMProduct_ID );
 					BOMLine.setM_Locator_ID( defaultLocator );
 					BOMLine.setQtyUsed( BOMMovementQty);
+					BOMLine.setMovementQty( BOMMovementQty.negate() );
 					
 					BOMLine.setPlannedQty( BOMMovementQty);
 					
