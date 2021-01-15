@@ -1062,6 +1062,7 @@ public class OrderReceiptIssue extends GenForm {
 				 mpl.setM_Product_ID(productID);
 				 mpl.setM_Locator_ID(locatorID);
 				 mpl.setPlannedQty(lines[0].getQtyRequired());
+				 mpl.set_ValueOfColumn(MPPOrderBOMLine.COLUMNNAME_PP_Order_BOMLine_ID, key.getKey());
 				 System.out.println(m_issue[i][0].get(5));
 				 mpl.set_ValueOfColumn("ScrappedQty",m_issue[i][0].get(5));
 				 if(lines[0].get_ValueAsBoolean("IsDerivative")) {
@@ -1070,6 +1071,7 @@ public class OrderReceiptIssue extends GenForm {
 				 }else {
 					 mpl.setIsEndProduct(false);
 					 mpl.setQtyUsed(qtyLine);
+					 mpl.setMovementQty(qtyLine.negate());
 				 }
 				
 				 mpl.saveEx(trxName);

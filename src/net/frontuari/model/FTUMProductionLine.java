@@ -22,11 +22,14 @@ import org.compiere.model.MProductionLineMA;
 import org.compiere.model.MProductionPlan;
 import org.compiere.model.MQualityTest;
 import org.compiere.model.MStorageOnHand;
+import org.compiere.model.MStorageReservation;
 import org.compiere.model.MTransaction;
 import org.compiere.model.Query;
 import org.compiere.util.DB;
 import org.compiere.util.Env;
 import org.compiere.util.Util;
+import org.eevolution.model.X_PP_Order_BOMLine;
+import org.libero.model.MPPOrderBOMLine;
 
 public class FTUMProductionLine extends MProductionLine {
 
@@ -34,6 +37,8 @@ public class FTUMProductionLine extends MProductionLine {
 	 * 
 	 */
 	private static final long serialVersionUID = 7413655891179840601L;
+	
+	public static final String COLUMNNAME_QtyOverReceipt = "QtyOverReceipt";
 
 	public FTUMProductionLine(Properties ctx, ResultSet rs, String trxName) {
 		super(ctx, rs, trxName);
@@ -122,6 +127,40 @@ public class FTUMProductionLine extends MProductionLine {
 			MStorageOnHand storage = MStorageOnHand.getCreate(getCtx(), getM_Locator_ID(),
 					getM_Product_ID(), asi.get_ID(),dateMPolicy, get_TrxName());
 			storage.addQtyOnHand(getMovementQty());
+			
+			//Update Reserved Qty if Have PP_Order_BOMLine_ID > 0
+			if (get_ValueAsInt(X_PP_Order_BOMLine.COLUMNNAME_PP_Order_BOMLine_ID) > 0)
+			{
+				MPPOrderBOMLine line = new MPPOrderBOMLine(getCtx()
+						, get_ValueAsInt(X_PP_Order_BOMLine.COLUMNNAME_PP_Order_BOMLine_ID)
+						, get_TrxName());
+				
+				//We Have Qty To Deliver
+				BigDecimal toDeliver = line.getQtyRequired()
+						.subtract(line.getQtyDelivered());
+				BigDecimal overUnderQty = BigDecimal.ZERO;
+				
+				if (getMovementQty().compareTo(toDeliver) > 0)
+					overUnderQty = getMovementQty().subtract(toDeliver);
+				
+				if (BigDecimal.ZERO.compareTo(overUnderQty) != 0)
+					set_ValueOfColumn(COLUMNNAME_QtyOverReceipt, overUnderQty);
+				
+				BigDecimal qtyUpdate = getMovementQty().subtract(overUnderQty);
+				
+				if (!MStorageReservation.add(getCtx(), line.getM_Warehouse_ID()
+						, line.getM_Product_ID(), line.getM_AttributeSetInstance_ID()
+						, qtyUpdate.negate(), false, get_TrxName()))
+					errorString.append("Storage Update  Error!\n");
+				else
+				{
+					line.setQtyReserved(line.getQtyReserved().subtract(qtyUpdate));
+					line.setQtyDelivered(line.getQtyDelivered().add(getMovementQty()));					
+					line.saveEx();
+				}
+			}
+			//End By Argenis Rodríguez
+			
 			if (log.isLoggable(Level.FINE))log.log(Level.FINE, "Created finished goods line " + getLine());
 			
 			return errorString.toString();
@@ -299,6 +338,41 @@ public class FTUMProductionLine extends MProductionLine {
 			}
 			
 		}
+		//Update Reserved Qty if Have PP_Order_BOMLine_ID > 0
+		if (get_ValueAsInt(X_PP_Order_BOMLine.COLUMNNAME_PP_Order_BOMLine_ID) > 0)
+		{
+			
+			BigDecimal movementQty = getMovementQty().abs();
+			
+			MPPOrderBOMLine line = new MPPOrderBOMLine(getCtx()
+					, get_ValueAsInt(X_PP_Order_BOMLine.COLUMNNAME_PP_Order_BOMLine_ID)
+					, get_TrxName());
+			
+			//We Have Qty To Deliver
+			BigDecimal toDeliver = line.getQtyRequired()
+					.subtract(line.getQtyDelivered());
+			BigDecimal overUnderQty = BigDecimal.ZERO;
+			
+			if (movementQty.compareTo(toDeliver) > 0)
+				overUnderQty = movementQty.subtract(toDeliver);
+			
+			if (BigDecimal.ZERO.compareTo(overUnderQty) != 0)
+				set_ValueOfColumn(COLUMNNAME_QtyOverReceipt, overUnderQty);
+			
+			BigDecimal qtyUpdate = movementQty.subtract(overUnderQty);
+			
+			if (!MStorageReservation.add(getCtx(), line.getM_Warehouse_ID()
+					, line.getM_Product_ID(), line.getM_AttributeSetInstance_ID()
+					, qtyUpdate.negate(), !line.get_ValueAsBoolean("IsDerivative"), get_TrxName()))
+				errorString.append("Storage Update  Error!\n");
+			else
+			{
+				line.setQtyReserved(line.getQtyReserved().subtract(qtyUpdate));
+				line.setQtyDelivered(line.getQtyDelivered().add(movementQty));					
+				line.saveEx();
+			}
+		}
+		//End By Argenis Rodríguez
 			
 		return errorString.toString();
 		

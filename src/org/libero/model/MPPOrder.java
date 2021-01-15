@@ -674,7 +674,7 @@ public class MPPOrder extends X_PP_Order implements DocAction
 			/*if (!MStorageOnHand.add(getCtx(), getM_Warehouse_ID(), M_Locator_ID,
 					getM_Product_ID(), getM_AttributeSetInstance_ID(), ordered, get_TrxName()))*/
 			if(!MStorageReservation.add(getCtx(), getM_Warehouse_ID(), getM_Product_ID(), 
-					getM_AttributeSetInstance_ID(), ordered, !getC_DocType().isSOTrx(), get_TrxName()))
+					getM_AttributeSetInstance_ID(), ordered, false, get_TrxName()))
 			{
 				throw new AdempiereException();
 			}
@@ -685,7 +685,7 @@ public class MPPOrder extends X_PP_Order implements DocAction
 			/*if (!MStorageOnHand.add(getCtx(), getM_Warehouse_ID(), M_Locator_ID,
 					getM_Product_ID(), getM_AttributeSetInstance_ID(), ordered, get_TrxName()))*/
 			if(!MStorageReservation.add(getCtx(), getM_Warehouse_ID(), getM_Product_ID(), 
-					getM_AttributeSetInstance_ID(), ordered, !getC_DocType().isSOTrx(), get_TrxName()))
+					getM_AttributeSetInstance_ID(), ordered, false, get_TrxName()))
 			{
 				throw new AdempiereException();
 			}
@@ -910,7 +910,7 @@ public class MPPOrder extends X_PP_Order implements DocAction
 		{
 			BigDecimal old = line.getQtyRequired();
 			if (old.compareTo(line.getQtyDelivered()) != 0)
-			{	
+			{
 				line.setQtyRequired(line.getQtyDelivered());
 				line.addDescription(Msg.parseTranslation(getCtx(), "@closed@ @QtyRequired@ (" + old + ")"));
 				line.saveEx(get_TrxName());

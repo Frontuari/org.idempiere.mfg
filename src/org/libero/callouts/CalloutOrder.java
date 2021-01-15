@@ -17,6 +17,7 @@
 package org.libero.callouts;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 import java.util.Properties;
 
 import org.adempiere.model.GridTabWrapper;
@@ -25,7 +26,9 @@ import org.compiere.model.GridField;
 import org.compiere.model.GridTab;
 import org.compiere.model.MDocType;
 import org.compiere.model.MProduct;
+import org.compiere.model.MResource;
 import org.compiere.model.MUOMConversion;
+import org.compiere.model.Query;
 import org.compiere.util.Env;
 import org.compiere.wf.MWorkflow;
 import org.eevolution.model.I_PP_Order;
@@ -33,6 +36,7 @@ import org.eevolution.model.I_PP_Product_BOM;
 import org.eevolution.model.I_PP_Product_Planning;
 import org.eevolution.model.MPPProductBOM;
 import org.eevolution.model.MPPProductPlanning;
+import org.eevolution.model.X_PP_Order;
 import org.libero.model.MPPOrder; 
 
 /**
@@ -131,6 +135,34 @@ public class CalloutOrder extends CalloutEngine
 		return "";
 	}
 	
+	/**
+	 * @author Argenis Rodríguez
+	 * @param ctx
+	 * @param WindowNo
+	 * @param mTab
+	 * @param mField
+	 * @param value
+	 * @return
+	 */
+	public String resource(Properties ctx, int WindowNo
+			, GridTab mTab, GridField mField, Object value) {
+		
+		int S_Resource_ID = Optional.ofNullable((Integer) value)
+				.orElse(0);
+		
+		if (S_Resource_ID <= 0)
+		{
+			mTab.setValue(X_PP_Order.COLUMNNAME_M_Warehouse_ID, null);
+			return "";
+		}
+		
+		MResource resource = new MResource(ctx, S_Resource_ID, null);
+		
+		mTab.setValue(X_PP_Order.COLUMNNAME_M_Warehouse_ID, resource.getM_Warehouse_ID());
+		
+		return "";
+	}
+	
 	public String product (Properties ctx, int WindowNo, GridTab mTab, GridField mField, Object value)
 	{
 		if (isCalloutActive())
@@ -201,7 +233,7 @@ public class CalloutOrder extends CalloutEngine
 		}
 		if (pp.getPP_Product_BOM_ID() <= 0)
 		{
-			I_PP_Product_BOM bom = MPPProductBOM.getDefault(product, null);
+			I_PP_Product_BOM bom = getDefault(product, null);
 			if (bom != null)
 			{
 				pp.setPP_Product_BOM_ID(bom.getPP_Product_BOM_ID());
@@ -209,6 +241,27 @@ public class CalloutOrder extends CalloutEngine
 		}
 		//
 		return pp;
+	}
+	
+	/**
+	 * Get BOM with Default Logic (Product = BOM Product and BOM Value = Product Value) 
+	 * @param product
+	 * @param trxName
+	 * @return product BOM
+	 */
+	public static MPPProductBOM getDefault(MProduct product, String trxName)
+	{
+		MPPProductBOM bom = new Query(product.getCtx(), MPPProductBOM.Table_Name, "M_Product_ID=? AND Value=?", trxName)
+				.setParameters(new Object[]{product.getM_Product_ID(), product.getValue()})
+				.setClient_ID()
+				.first();
+		// If outside trx, then cache it
+		/*if (bom != null && trxName == null)
+		{
+			s_cache.put(bom.get_ID(), bom);
+		}*/
+		//
+		return bom;
 	}
 }	//	CalloutOrder
 

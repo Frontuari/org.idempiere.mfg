@@ -20,6 +20,7 @@ import org.compiere.model.I_M_ForecastLine;
 import org.compiere.model.I_M_InOut;
 import org.compiere.model.I_M_Movement;
 import org.compiere.model.I_M_Product;
+import org.compiere.model.I_M_Production;
 import org.compiere.model.I_M_Requisition;
 import org.compiere.model.I_M_RequisitionLine;
 import org.compiere.model.MForecastLine;
@@ -45,6 +46,7 @@ import org.compiere.util.Env;
 import org.compiere.util.Msg;
 import org.eevolution.model.MDDOrder;
 import org.eevolution.model.MDDOrderLine;
+import org.eevolution.model.X_PP_Order;
 import org.libero.model.MPPCostCollector;
 import org.libero.model.MPPMRP;
 import org.libero.model.MPPOrder;
@@ -55,6 +57,8 @@ import org.libero.tables.I_DD_OrderLine;
 import org.libero.tables.I_PP_Order;
 import org.libero.tables.I_PP_Order_BOMLine;
 import org.osgi.service.event.Event;
+
+import net.frontuari.model.FTUMProduction;
 
 /**
  *
@@ -112,6 +116,7 @@ public class MFG_Validator extends AbstractEventHandler {
 		registerTableEvent(IEventTopics.DOC_BEFORE_COMPLETE, I_M_ForecastLine.Table_Name);
 		registerTableEvent(IEventTopics.DOC_AFTER_COMPLETE, I_M_Movement.Table_Name);
 		registerTableEvent(IEventTopics.DOC_AFTER_COMPLETE, I_M_InOut.Table_Name);
+		registerTableEvent(IEventTopics.DOC_AFTER_COMPLETE, I_M_Production.Table_Name);
 		log.info("MFG MODEL VALIDATOR IS NOW INITIALIZED");
 	}
 
@@ -148,6 +153,24 @@ public class MFG_Validator extends AbstractEventHandler {
 			{
 				doc = ((MOrderLine)po).getParent();
 			}
+			
+			//Add Production Events
+			if (IEventTopics.DOC_AFTER_COMPLETE.equals(type)
+					&& FTUMProduction.Table_Name.equals(po.get_TableName()))
+			{
+				FTUMProduction production = (FTUMProduction) po;
+				
+				if (production.get_ValueAsInt(X_PP_Order.COLUMNNAME_PP_Order_ID) > 0)
+				{
+					MPPOrder order = new MPPOrder(production.getCtx()
+							, production.get_ValueAsInt(X_PP_Order.COLUMNNAME_PP_Order_ID)
+							, production.get_TrxName());
+					
+					if (!order.processIt(MPPOrder.ACTION_Close))
+						throw new AdempiereException("Could not Close PP_Order [" + order.getProcessMsg() + "]");
+				}
+			}
+			//End By Argenis Rodríguez
 			
 			if (doc != null)
 			{
