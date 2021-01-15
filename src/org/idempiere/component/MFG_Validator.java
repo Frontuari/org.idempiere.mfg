@@ -168,6 +168,7 @@ public class MFG_Validator extends AbstractEventHandler {
 					
 					if (!order.processIt(MPPOrder.ACTION_Close))
 						throw new AdempiereException("Could not Close PP_Order [" + order.getProcessMsg() + "]");
+					order.saveEx();
 				}
 			}
 			//End By Argenis Rodríguez
