@@ -8,6 +8,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.logging.Level;
 
@@ -407,11 +408,17 @@ public class FTUMProduction extends MProduction {
 				FTUMProductionLine[] flines = (FTUMProductionLine[]) fplan.getLines();
 				for(FTUMProductionLine fline : flines) {
 					FTUMProductionLine tline = new FTUMProductionLine(tplan);
+					
+					BigDecimal qtyOverReceipt = Optional.ofNullable((BigDecimal) fline.get_Value(FTUMProductionLine.COLUMNNAME_QtyOverReceipt))
+							.orElse(BigDecimal.ZERO)
+							.negate();
+					
 					PO.copyValues (fline, tline, getAD_Client_ID(), getAD_Org_ID());
 					tline.setM_ProductionPlan_ID(tplan.getM_ProductionPlan_ID());
 					tline.setMovementQty(fline.getMovementQty().negate());
 					tline.setPlannedQty(fline.getPlannedQty().negate());
 					tline.setQtyUsed(fline.getQtyUsed().negate());
+					tline.set_ValueOfColumn(FTUMProductionLine.COLUMNNAME_QtyOverReceipt, qtyOverReceipt);
 					tline.saveEx();
 				}
 			}
@@ -421,11 +428,17 @@ public class FTUMProduction extends MProduction {
 			FTUMProductionLine[] flines = getLines();
 			for(FTUMProductionLine fline : flines) {
 				FTUMProductionLine tline = new FTUMProductionLine(to);
+				
+				BigDecimal qtyOverReceipt = Optional.ofNullable((BigDecimal) fline.get_Value(FTUMProductionLine.COLUMNNAME_QtyOverReceipt))
+						.orElse(BigDecimal.ZERO)
+						.negate();
+				
 				PO.copyValues (fline, tline, getAD_Client_ID(), getAD_Org_ID());
 				tline.setM_Production_ID(to.getM_Production_ID());
 				tline.setMovementQty(fline.getMovementQty().negate());
 				tline.setPlannedQty(fline.getPlannedQty().negate());
 				tline.setQtyUsed(fline.getQtyUsed().negate());
+				tline.set_ValueOfColumn(FTUMProductionLine.COLUMNNAME_QtyOverReceipt, qtyOverReceipt);
 				tline.saveEx();
 			}
 		}

@@ -999,6 +999,7 @@ public class OrderReceiptIssue extends GenForm {
 		production.setUser1_ID(order.getUser1_ID());
 		production.setUser2_ID(order.getUser2_ID());
 		production.setIsUseProductionPlan(false);
+		production.set_ValueOfColumn("PP_Product_BOM_ID", order.get_Value("PP_Product_BOM_ID"));
 		production.saveEx(trxName);
 		
 		int lineNumber = 10;

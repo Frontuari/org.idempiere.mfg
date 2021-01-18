@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.logging.Level;
 
@@ -29,6 +30,7 @@ import org.compiere.util.DB;
 import org.compiere.util.Env;
 import org.compiere.util.Util;
 import org.eevolution.model.X_PP_Order_BOMLine;
+import org.libero.model.MPPOrder;
 import org.libero.model.MPPOrderBOMLine;
 
 public class FTUMProductionLine extends MProductionLine {
@@ -54,6 +56,32 @@ public class FTUMProductionLine extends MProductionLine {
 	
 	public FTUMProductionLine(MProductionPlan header) {
 		super(header);
+	}
+	
+	/**
+	 * @author Argenis Rodríguez
+	 * @return PP_Order_ID
+	 */
+	public int getPP_Order_ID() {
+		
+		return DB.getSQLValue(get_TrxName()
+				, "SELECT PP_Order_ID FROM M_Production WHERE M_Production_ID=?"
+				, getM_Production_ID());
+	}
+	
+	public int getHeaderProduct_ID() {
+		
+		if (getM_Production_ID() > 0)
+		{
+			productionParent = productionParent != null ? productionParent
+					: new FTUMProduction(getCtx(), getM_Production_ID(), get_TrxName());
+			
+			return productionParent.getM_Product_ID();
+		}
+		else if (getM_ProductionPlan_ID() > 0)
+			return getM_ProductionPlan().getM_Product_ID();
+		
+		return 0;
 	}
 	
 	/**
@@ -130,35 +158,10 @@ public class FTUMProductionLine extends MProductionLine {
 			
 			//Update Reserved Qty if Have PP_Order_BOMLine_ID > 0
 			if (get_ValueAsInt(X_PP_Order_BOMLine.COLUMNNAME_PP_Order_BOMLine_ID) > 0)
-			{
-				MPPOrderBOMLine line = new MPPOrderBOMLine(getCtx()
-						, get_ValueAsInt(X_PP_Order_BOMLine.COLUMNNAME_PP_Order_BOMLine_ID)
-						, get_TrxName());
-				
-				//We Have Qty To Deliver
-				BigDecimal toDeliver = line.getQtyRequired()
-						.subtract(line.getQtyDelivered());
-				BigDecimal overUnderQty = BigDecimal.ZERO;
-				
-				if (getMovementQty().compareTo(toDeliver) > 0)
-					overUnderQty = getMovementQty().subtract(toDeliver);
-				
-				if (BigDecimal.ZERO.compareTo(overUnderQty) != 0)
-					set_ValueOfColumn(COLUMNNAME_QtyOverReceipt, overUnderQty);
-				
-				BigDecimal qtyUpdate = getMovementQty().subtract(overUnderQty);
-				
-				if (!MStorageReservation.add(getCtx(), line.getM_Warehouse_ID()
-						, line.getM_Product_ID(), line.getM_AttributeSetInstance_ID()
-						, qtyUpdate.negate(), false, get_TrxName()))
-					errorString.append("Storage Update  Error!\n");
-				else
-				{
-					line.setQtyReserved(line.getQtyReserved().subtract(qtyUpdate));
-					line.setQtyDelivered(line.getQtyDelivered().add(getMovementQty()));					
-					line.saveEx();
-				}
-			}
+				errorString.append(updateReserve());
+			else if (getM_Product_ID() == getHeaderProduct_ID())
+				errorString.append(updateReservePPOrder(getPP_Order_ID()));
+			
 			//End By Argenis Rodríguez
 			
 			if (log.isLoggable(Level.FINE))log.log(Level.FINE, "Created finished goods line " + getLine());
@@ -317,7 +320,7 @@ public class FTUMProductionLine extends MProductionLine {
 						if (log.isLoggable(Level.FINE))log.log(Level.FINE, "Saved MA for " + toString());
 					}
 					matTrx = new MTransaction (getCtx(), getAD_Org_ID(), 
-							lineQty.signum() > 0 ? "P-" : "P+", 
+							"P-", 
 							getM_Locator_ID(), getM_Product_ID(), asi.get_ID(), 
 							lineQty.negate(), date, get_TrxName());
 					matTrx.setM_ProductionLine_ID(get_ID());
@@ -340,42 +343,98 @@ public class FTUMProductionLine extends MProductionLine {
 		}
 		//Update Reserved Qty if Have PP_Order_BOMLine_ID > 0
 		if (get_ValueAsInt(X_PP_Order_BOMLine.COLUMNNAME_PP_Order_BOMLine_ID) > 0)
+			errorString.append(updateReserve());
+		//End By Argenis Rodríguez
+			
+		return errorString.toString();
+	}
+	
+	private String updateReservePPOrder(int PP_Order_ID) {
+		
+		if (PP_Order_ID <= 0)
+			return "";
+		
+		boolean isReversal = getProductionReversalId() > 0;
+		
+		BigDecimal movementQty = !isReversal ? getMovementQty().abs()
+				: getMovementQty().abs().negate();
+		
+		MPPOrder order = new MPPOrder(getCtx(), PP_Order_ID, get_TrxName());
+		
+		BigDecimal overUnderQty = BigDecimal.ZERO;
+		
+		if (!isReversal)
 		{
-			
-			BigDecimal movementQty = getMovementQty().abs();
-			
-			MPPOrderBOMLine line = new MPPOrderBOMLine(getCtx()
-					, get_ValueAsInt(X_PP_Order_BOMLine.COLUMNNAME_PP_Order_BOMLine_ID)
-					, get_TrxName());
-			
-			//We Have Qty To Deliver
-			BigDecimal toDeliver = line.getQtyRequired()
-					.subtract(line.getQtyDelivered());
-			BigDecimal overUnderQty = BigDecimal.ZERO;
+			BigDecimal toDeliver = order.getQtyOrdered()
+					.subtract(order.getQtyDelivered());
 			
 			if (movementQty.compareTo(toDeliver) > 0)
 				overUnderQty = movementQty.subtract(toDeliver);
 			
 			if (BigDecimal.ZERO.compareTo(overUnderQty) != 0)
 				set_ValueOfColumn(COLUMNNAME_QtyOverReceipt, overUnderQty);
-			
-			BigDecimal qtyUpdate = movementQty.subtract(overUnderQty);
-			
-			if (!MStorageReservation.add(getCtx(), line.getM_Warehouse_ID()
-					, line.getM_Product_ID(), line.getM_AttributeSetInstance_ID()
-					, qtyUpdate.negate(), !line.get_ValueAsBoolean("IsDerivative"), get_TrxName()))
-				errorString.append("Storage Update  Error!\n");
-			else
-			{
-				line.setQtyReserved(line.getQtyReserved().subtract(qtyUpdate));
-				line.setQtyDelivered(line.getQtyDelivered().add(movementQty));					
-				line.saveEx();
-			}
 		}
-		//End By Argenis Rodríguez
-			
-		return errorString.toString();
+		else
+			overUnderQty = Optional.ofNullable((BigDecimal) get_Value(COLUMNNAME_QtyOverReceipt))
+				.orElse(BigDecimal.ZERO);
 		
+		BigDecimal qtyUpdate = movementQty.subtract(overUnderQty);
+		
+		if (!MStorageReservation.add(getCtx(), order.getM_Warehouse_ID()
+				, getM_Product_ID(), getM_AttributeSetInstance_ID()
+				, qtyUpdate.negate(), false, get_TrxName()))
+			return "Storage Update  Error!\n";
+		else
+		{
+			order.setQtyReserved(order.getQtyReserved().subtract(qtyUpdate));
+			order.setQtyDelivered(order.getQtyDelivered().add(movementQty));
+			order.saveEx();
+		}
+		
+		return "";
+	}
+	
+	private String updateReserve() {
+		boolean isReversal = getProductionReversalId() > 0;
+		
+		BigDecimal movementQty = !isReversal ? getMovementQty().abs()
+				: getMovementQty().abs().negate();
+		
+		MPPOrderBOMLine line = new MPPOrderBOMLine(getCtx()
+				, get_ValueAsInt(X_PP_Order_BOMLine.COLUMNNAME_PP_Order_BOMLine_ID)
+				, get_TrxName());
+		
+		//We Have Qty To Deliver
+		BigDecimal overUnderQty = BigDecimal.ZERO;
+		
+		if (!isReversal)
+		{
+			BigDecimal toDeliver = line.getQtyRequired()
+					.subtract(line.getQtyDelivered());
+			
+			if (movementQty.compareTo(toDeliver) > 0)
+				overUnderQty = movementQty.subtract(toDeliver);
+			
+			if (BigDecimal.ZERO.compareTo(overUnderQty) != 0)
+				set_ValueOfColumn(COLUMNNAME_QtyOverReceipt, overUnderQty);
+		}
+		else
+			overUnderQty = Optional.ofNullable((BigDecimal) get_Value(COLUMNNAME_QtyOverReceipt))
+							.orElse(BigDecimal.ZERO);
+		
+		BigDecimal qtyUpdate = movementQty.subtract(overUnderQty);
+		
+		if (!MStorageReservation.add(getCtx(), line.getM_Warehouse_ID()
+				, line.getM_Product_ID(), line.getM_AttributeSetInstance_ID()
+				, qtyUpdate.negate(), !line.get_ValueAsBoolean("IsDerivative"), get_TrxName()))
+			return "Storage Update  Error!\n";
+		else
+		{
+			line.setQtyReserved(line.getQtyReserved().subtract(qtyUpdate));
+			line.setQtyDelivered(line.getQtyDelivered().add(movementQty));					
+			line.saveEx();
+		}
+		return "";
 	}
 	
 	/**
@@ -463,7 +522,7 @@ public class FTUMProductionLine extends MProductionLine {
 	public int getIsDerivative(int PP_Product_ID) {
 		int PP_Product_BOM_ID = 0;
 		
-		MProduction mp = new MProduction(getCtx(), getM_Production_ID(), null);
+		MProduction mp = new MProduction(getCtx(), getM_Production_ID(), get_TrxName());
 		PP_Product_BOM_ID = mp.get_ValueAsInt("PP_Product_BOM_ID");
 		
 		String sql = "SELECT (CASE WHEN IsDerivative = 'Y' THEN 1 ELSE 0 END) IsDerivative FROM PP_Product_BOMLine\n" + 
