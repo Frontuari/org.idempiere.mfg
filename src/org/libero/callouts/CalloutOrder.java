@@ -253,6 +253,7 @@ public class CalloutOrder extends CalloutEngine
 	{
 		MPPProductBOM bom = new Query(product.getCtx(), MPPProductBOM.Table_Name, "M_Product_ID=? AND Value=?", trxName)
 				.setParameters(new Object[]{product.getM_Product_ID(), product.getValue()})
+				.setOrderBy("PP_Product_BOM_ID DESC")
 				.setClient_ID()
 				.first();
 		// If outside trx, then cache it
