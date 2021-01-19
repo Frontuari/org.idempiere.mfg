@@ -375,7 +375,8 @@ public class FTUMProduction extends MProduction {
 		setReversal_ID(reversal.getM_Production_ID());
 		setDocStatus(DOCSTATUS_Reversed);	//	may come from void
 		setDocAction(DOCACTION_None);		
-
+		saveEx(get_TrxName());
+		
 		return reversal;
 	}
 	

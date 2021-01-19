@@ -39,6 +39,8 @@ public class MPPOrderBOMLine extends X_PP_Order_BOMLine
 {
 	private static final long serialVersionUID = 1L;
 	
+	public static String COLUMNNAME_QtyLost = "QtyLost";
+	
 	public static MPPOrderBOMLine forM_Product_ID(Properties ctx, int PP_Order_ID, int M_Product_ID, String trxName)
 	{
 		//TODO: vpj-cd What happen when a product it more the time in Order

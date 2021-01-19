@@ -52,6 +52,7 @@ import org.libero.model.MPPMRP;
 import org.libero.model.MPPOrder;
 import org.libero.model.MPPOrderBOM;
 import org.libero.model.MPPOrderBOMLine;
+import org.libero.process.CompletePrintOrder;
 import org.libero.tables.I_DD_Order;
 import org.libero.tables.I_DD_OrderLine;
 import org.libero.tables.I_PP_Order;
@@ -59,6 +60,7 @@ import org.libero.tables.I_PP_Order_BOMLine;
 import org.osgi.service.event.Event;
 
 import net.frontuari.model.FTUMProduction;
+import net.frontuari.util.ProcessBuilder;
 
 /**
  *
@@ -116,7 +118,12 @@ public class MFG_Validator extends AbstractEventHandler {
 		registerTableEvent(IEventTopics.DOC_BEFORE_COMPLETE, I_M_ForecastLine.Table_Name);
 		registerTableEvent(IEventTopics.DOC_AFTER_COMPLETE, I_M_Movement.Table_Name);
 		registerTableEvent(IEventTopics.DOC_AFTER_COMPLETE, I_M_InOut.Table_Name);
+		//Add Production Events by Argenis Rodríguez 18-01-2021
 		registerTableEvent(IEventTopics.DOC_AFTER_COMPLETE, I_M_Production.Table_Name);
+		registerTableEvent(IEventTopics.DOC_AFTER_REVERSEACCRUAL, I_M_Production.Table_Name);
+		registerTableEvent(IEventTopics.DOC_AFTER_REVERSECORRECT, I_M_Production.Table_Name);
+		registerTableEvent(IEventTopics.DOC_AFTER_VOID, I_M_Production.Table_Name);
+		//End By Argenis Rodríguez
 		log.info("MFG MODEL VALIDATOR IS NOW INITIALIZED");
 	}
 
@@ -160,7 +167,8 @@ public class MFG_Validator extends AbstractEventHandler {
 			{
 				FTUMProduction production = (FTUMProduction) po;
 				
-				if (production.get_ValueAsInt(X_PP_Order.COLUMNNAME_PP_Order_ID) > 0)
+				if (production.get_ValueAsInt(X_PP_Order.COLUMNNAME_PP_Order_ID) > 0
+						&& production.getReversal_ID() <= 0)
 				{
 					MPPOrder order = new MPPOrder(production.getCtx()
 							, production.get_ValueAsInt(X_PP_Order.COLUMNNAME_PP_Order_ID)
@@ -169,6 +177,41 @@ public class MFG_Validator extends AbstractEventHandler {
 					if (!order.processIt(MPPOrder.ACTION_Close))
 						throw new AdempiereException("Could not Close PP_Order [" + order.getProcessMsg() + "]");
 					order.saveEx();
+				}
+			}
+			
+			if ((IEventTopics.DOC_AFTER_REVERSEACCRUAL.equals(type)
+					|| IEventTopics.DOC_AFTER_REVERSECORRECT.equals(type)
+					|| IEventTopics.DOC_AFTER_VOID.equals(type))
+					&& FTUMProduction.Table_Name.equals(po.get_TableName()))
+			{
+				FTUMProduction production = (FTUMProduction) po;
+				
+				if (production.get_ValueAsInt(X_PP_Order.COLUMNNAME_PP_Order_ID) > 0)
+				{
+					MPPOrder order = new MPPOrder(production.getCtx()
+							, production.get_ValueAsInt(X_PP_Order.COLUMNNAME_PP_Order_ID)
+							, production.get_TrxName());
+					
+					if (MPPOrder.DOCSTATUS_Closed.equals(order.getDocStatus()))
+					{
+						if (!order.processIt(MPPOrder.ACTION_ReActivate))
+							throw new AdempiereException("Could not Reactivate PP_Order [" + order.getProcessMsg() + "]");
+						order.saveEx();
+						
+						ProcessBuilder builder = ProcessBuilder.build(CompletePrintOrder.class)
+								.withParameter("PP_Order_ID", order.get_ID())
+								.withParameter("IsPrintPickList", false)
+								.withParameter("IsPrintWorkflow", false)
+								.withParameter("IsPrintPackingList", false)
+								.withParameter("IsComplete", true)
+								.withTrxName(production.get_TrxName());
+						
+						if (!builder.execute())
+							throw new AdempiereException("Could not Release Order [" + builder.getProcessMsg() + "]");
+						
+						order.load(order.get_TrxName());
+					}
 				}
 			}
 			//End By Argenis Rodríguez

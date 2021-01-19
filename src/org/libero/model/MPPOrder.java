@@ -16,6 +16,7 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.TreeSet;
 
@@ -76,6 +77,9 @@ public class MPPOrder extends X_PP_Order implements DocAction
 {
 	private static final long serialVersionUID = 1L;
 	private static CLogger log = CLogger.getCLogger(MPPOrder.class);
+	
+	public static String COLUMNNAME_QtyLost = "QtyLost";
+	
 	/**
 	 * get Manufacturing Order based in Sales Order ID
 	 * @param ctx Context
@@ -780,6 +784,8 @@ public class MPPOrder extends X_PP_Order implements DocAction
 			m_processMsg = valid;
 			return DocAction.STATUS_Invalid;
 		}
+		
+		setProcessed(true);
 		return DocAction.STATUS_Completed;
 	} //	completeIt
 
@@ -911,6 +917,7 @@ public class MPPOrder extends X_PP_Order implements DocAction
 			BigDecimal old = line.getQtyRequired();
 			if (old.compareTo(line.getQtyDelivered()) != 0)
 			{
+				line.set_ValueOfColumn(MPPOrderBOMLine.COLUMNNAME_QtyLost, old.subtract(line.getQtyDelivered()));
 				line.setQtyRequired(line.getQtyDelivered());
 				line.addDescription(Msg.parseTranslation(getCtx(), "@closed@ @QtyRequired@ (" + old + ")"));
 				line.saveEx(get_TrxName());
@@ -925,6 +932,7 @@ public class MPPOrder extends X_PP_Order implements DocAction
 		if (old.signum() != 0)
 		{	
 			addDescription(Msg.parseTranslation(getCtx(),"@closed@ @QtyOrdered@ : (" + old + ")"));
+			set_ValueOfColumn(COLUMNNAME_QtyLost, old.subtract(getQtyDelivered()));
 			setQtyOrdered(getQtyDelivered());
 			saveEx(get_TrxName());
 		}	
@@ -962,10 +970,46 @@ public class MPPOrder extends X_PP_Order implements DocAction
 		if(isDelivered())
 			throw new AdempiereException("Cannot re activate this document because exist transactions"); // 
 		
+		updateLineQty();
+		updateHeaderQty();
+		
 		setDocAction(DOCACTION_Complete);
 		setProcessed(false);
 		return true;
 	} //	reActivateIt
+	
+	/**
+	 * @author Argenis Rodríguez
+	 */
+	private void updateHeaderQty() {
+		
+		BigDecimal qtyLost = Optional.ofNullable((BigDecimal) get_Value(COLUMNNAME_QtyLost))
+				.orElse(BigDecimal.ZERO);
+		
+		setQtyOrdered(getQtyOrdered().add(qtyLost));
+		set_ValueOfColumn(COLUMNNAME_QtyLost, BigDecimal.ZERO);
+		
+		orderStock();
+	}
+	
+	/**
+	 * @author Argenis Rodríguez
+	 */
+	private void updateLineQty() {
+		
+		for (MPPOrderBOMLine line: getLines(true))
+		{
+			BigDecimal qtyLost = Optional.ofNullable((BigDecimal) line.get_Value(MPPOrderBOMLine.COLUMNNAME_QtyLost))
+					.orElse(BigDecimal.ZERO);
+			
+			line.setQtyRequired(line.getQtyRequired().add(qtyLost));
+			line.set_ValueOfColumn(MPPOrderBOMLine.COLUMNNAME_QtyLost, BigDecimal.ZERO);
+			line.saveEx();
+			
+			line.reserveStock();
+			line.saveEx();
+		}
+	}
 
 	public int getDoc_User_ID()
 	{
@@ -1493,7 +1537,7 @@ public class MPPOrder extends X_PP_Order implements DocAction
 			}
 		}
 		
-		for(MPPOrderNode node : this.getMPPOrderWorkflow().getNodes(true, getAD_Client_ID()))
+		/*for(MPPOrderNode node : this.getMPPOrderWorkflow().getNodes(true, getAD_Client_ID()))
 		{
 			if(node.getQtyDelivered().signum() > 0)
 			{
@@ -1503,7 +1547,7 @@ public class MPPOrder extends X_PP_Order implements DocAction
 			{
 				return true;
 			}
-		}
+		}*/
 		
 		if(hasProduction())
 		{
