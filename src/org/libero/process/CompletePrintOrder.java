@@ -110,6 +110,10 @@ implements ClientProcess
 			//
 			// Process document
 			boolean ok = order.processIt(MPPOrder.DOCACTION_Complete);
+			
+			if (order.getDateStart() == null)
+				order.setDateStart(new Timestamp(System.currentTimeMillis()));
+			
 			order.saveEx(get_TrxName());
 			if (!ok)
 			{

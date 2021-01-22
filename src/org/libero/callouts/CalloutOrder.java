@@ -29,6 +29,7 @@ import org.compiere.model.MProduct;
 import org.compiere.model.MResource;
 import org.compiere.model.MUOMConversion;
 import org.compiere.model.Query;
+import org.compiere.util.DB;
 import org.compiere.util.Env;
 import org.compiere.wf.MWorkflow;
 import org.eevolution.model.I_PP_Order;
@@ -160,7 +161,19 @@ public class CalloutOrder extends CalloutEngine
 		
 		mTab.setValue(X_PP_Order.COLUMNNAME_M_Warehouse_ID, resource.getM_Warehouse_ID());
 		
+		int AD_WorkFlow_ID = getAD_WorkFlow_ID(S_Resource_ID);
+		
+		mTab.setValue(X_PP_Order.COLUMNNAME_AD_Workflow_ID, AD_WorkFlow_ID > 0 ? AD_WorkFlow_ID : null);
+		
 		return "";
+	}
+	
+	private int getAD_WorkFlow_ID(int S_Resource_ID) {
+		
+		return DB.getSQLValue(null
+				, "SELECT AD_WorkFlow_ID FROM AD_WorkFlow WHERE S_Resource_ID = ?"
+				  + " ORDER BY AD_WorkFlow_ID DESC"
+				, S_Resource_ID);
 	}
 	
 	public String product (Properties ctx, int WindowNo, GridTab mTab, GridField mField, Object value)

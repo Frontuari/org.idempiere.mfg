@@ -7,6 +7,7 @@
 package org.idempiere.component;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.Collection;
 
 import org.adempiere.base.event.AbstractEventHandler;
@@ -176,6 +177,10 @@ public class MFG_Validator extends AbstractEventHandler {
 					
 					if (!order.processIt(MPPOrder.ACTION_Close))
 						throw new AdempiereException("Could not Close PP_Order [" + order.getProcessMsg() + "]");
+					
+					if (order.getDateFinish() == null)
+						order.setDateFinish(new Timestamp(System.currentTimeMillis()));
+					
 					order.saveEx();
 				}
 			}
