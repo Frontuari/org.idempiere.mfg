@@ -154,6 +154,7 @@ public class CalloutOrder extends CalloutEngine
 		if (S_Resource_ID <= 0)
 		{
 			mTab.setValue(X_PP_Order.COLUMNNAME_M_Warehouse_ID, null);
+			mTab.setValue(X_PP_Order.COLUMNNAME_AD_Workflow_ID, null);
 			return "";
 		}
 		
