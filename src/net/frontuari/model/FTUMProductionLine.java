@@ -1,6 +1,7 @@
 package net.frontuari.model;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.util.List;
@@ -23,6 +24,7 @@ import org.compiere.model.MProductionPlan;
 import org.compiere.model.MQualityTest;
 import org.compiere.model.MStorageOnHand;
 import org.compiere.model.MTransaction;
+import org.compiere.model.MUOM;
 import org.compiere.model.Query;
 import org.compiere.util.DB;
 import org.compiere.util.Env;
@@ -41,14 +43,30 @@ public class FTUMProductionLine extends MProductionLine {
 
 	public FTUMProductionLine(Properties ctx, int M_ProductionLine_ID, String trxName) {
 		super(ctx, M_ProductionLine_ID, trxName);
+		if (M_ProductionLine_ID == 0)
+		{
+			setLine (0);
+			setM_AttributeSetInstance_ID (0);
+			setM_ProductionLine_ID (0);
+			setM_Production_ID (0);
+			setMovementQty (Env.ZERO);
+			setProcessed (false);
+		}
 	}
 
-	public FTUMProductionLine(FTUMProduction header) {
-		super(header);
+	public FTUMProductionLine( FTUMProduction header ) {
+		super( header.getCtx(), 0, header.get_TrxName() );
+		setM_Production_ID( header.get_ID());
+		setAD_Client_ID(header.getAD_Client_ID());
+		setAD_Org_ID(header.getAD_Org_ID());
+		productionParent = header;
 	}
 	
-	public FTUMProductionLine(MProductionPlan header) {
-		super(header);
+	public FTUMProductionLine( MProductionPlan header ) {
+		super( header.getCtx(), 0, header.get_TrxName() );
+		setM_ProductionPlan_ID( header.get_ID());
+		setAD_Client_ID(header.getAD_Client_ID());
+		setAD_Org_ID(header.getAD_Org_ID());
 	}
 	
 	/**
@@ -335,15 +353,124 @@ public class FTUMProductionLine extends MProductionLine {
 	{
 		if (productionParent == null && getM_Production_ID() > 0)
 			productionParent = new MProduction(getCtx(), getM_Production_ID(), get_TrxName());
+		
+		BigDecimal qtyused = getQtyUsed();
+		if(qtyused==null||qtyused.compareTo(BigDecimal.ZERO)==0){
+			setQtyUsed(BigDecimal.ZERO);
+		}
+		MProduct prod = new MProduct(getCtx(),getM_Product_ID(),get_TrxName());
+
+		int C_UOM_ID = get_ValueAsInt("C_UOM_ID");
+		if(C_UOM_ID>0)
+			C_UOM_ID=prod.getC_UOM_ID();
+		MUOM UOM = new MUOM (getCtx(),C_UOM_ID,get_TrxName());
+		String trxType = productionParent.get_ValueAsString("TrxType");
+		 
+		boolean isTransformation = trxType.equalsIgnoreCase("T");
+		
+		BigDecimal cost = BigDecimal.ZERO;
 
 		if (getM_Production_ID() > 0) 
 		{
-			if(productionParent.get_ValueAsInt("PP_Order_ID") == 0)
-			{
-				if ( productionParent.getM_Product_ID() == getM_Product_ID() && productionParent.getProductionQty().signum() == getMovementQty().signum())
-					setIsEndProduct(true);
-				else 
-					setIsEndProduct(false);
+			if(isTransformation){
+				BigDecimal movementQty = new BigDecimal(0);
+				if ( productionParent.getM_Product_ID() == getM_Product_ID()) {
+					
+					movementQty = getQtyUsed().negate();
+					if(C_UOM_ID>0){
+						if(prod.getC_UOM_ID()!=C_UOM_ID) {
+							String sql = "SELECT DivideRate FROM C_UOM_Conversion WHERE M_Product_ID="+prod.getM_Product_ID()+" AND C_UOM_ID="+prod.getC_UOM_ID()+" AND C_UOM_To_ID="+C_UOM_ID;
+							BigDecimal multiplyrate = DB.getSQLValueBD(get_TrxName(), sql);
+							if(multiplyrate.compareTo(BigDecimal.ZERO)>0) {						
+								movementQty = movementQty.multiply(multiplyrate).setScale(UOM.getStdPrecision(), RoundingMode.HALF_UP);
+								setMovementQty(movementQty);
+							}
+						}else
+							setMovementQty(movementQty);
+					}else
+						setMovementQty(movementQty);
+
+					if(is_ValueChanged("M_Product_ID")) {
+						cost = getPurchaseProductCost(productionParent.getM_Product_ID(),getAD_Org_ID());
+						set_ValueOfColumn("PriceCost", cost);
+					}
+				}else {		
+					BigDecimal conversionFactor = get_Value("MultiplyRate")!=null?(BigDecimal)get_Value("MultiplyRate"):BigDecimal.ZERO ;
+					
+					BigDecimal qtyUsed = getQtyUsed();
+					
+					movementQty = conversionFactor.multiply(qtyUsed).setScale(UOM.getStdPrecision(), RoundingMode.HALF_UP);
+					
+					if(C_UOM_ID>0){
+						if(prod.getC_UOM_ID()!=C_UOM_ID) {
+							String sql = "SELECT DivideRate FROM C_UOM_Conversion WHERE M_Product_ID="+prod.getM_Product_ID()+" AND C_UOM_ID="+prod.getC_UOM_ID()+" AND C_UOM_To_ID="+C_UOM_ID;
+							BigDecimal multiplyrate = DB.getSQLValueBD(get_TrxName(), sql);
+							if(multiplyrate.compareTo(BigDecimal.ZERO)>0) {						
+								movementQty = movementQty.multiply(multiplyrate).setScale(UOM.getStdPrecision(), RoundingMode.HALF_UP);
+								setMovementQty(movementQty);
+							}
+						}else
+							setMovementQty(movementQty);
+					}else
+						setMovementQty(movementQty);
+
+					if(is_ValueChanged("M_Product_ID")) {
+						cost = getPurchaseProductCost(productionParent.getM_Product_ID(),getAD_Org_ID());
+						cost = cost.multiply(getQtyUsed()).setScale(UOM.getCostingPrecision(), RoundingMode.HALF_UP);
+						cost = cost.divide(movementQty, UOM.getCostingPrecision(), RoundingMode.HALF_UP);						
+						if(cost.compareTo(BigDecimal.ZERO)>0)
+							set_ValueOfColumn("PriceCost", cost);
+					}
+					
+				}
+			}else {
+				if(productionParent.get_ValueAsInt("PP_Order_ID") == 0)
+				{
+					if ( productionParent.getM_Product_ID() == getM_Product_ID() && productionParent.getProductionQty().signum() == getMovementQty().signum()) {
+						if(C_UOM_ID>0){
+							if(prod.getC_UOM_ID()!=C_UOM_ID) {
+								String sql = "SELECT DivideRate FROM C_UOM_Conversion WHERE M_Product_ID="+prod.getM_Product_ID()+" AND C_UOM_ID="+prod.getC_UOM_ID()+" AND C_UOM_To_ID="+C_UOM_ID;
+								BigDecimal multiplyrate = DB.getSQLValueBD(get_TrxName(), sql);
+								if(multiplyrate.compareTo(BigDecimal.ZERO)>0) {
+									BigDecimal base = getPlannedQty();
+									base = base.multiply(multiplyrate).setScale(UOM.getStdPrecision(), RoundingMode.HALF_UP);
+									setMovementQty(base);
+								}
+							}
+						}
+						setIsEndProduct(true);
+					}else {
+						if(C_UOM_ID>0){
+							if(prod.getC_UOM_ID()!=C_UOM_ID) {
+								String sql = "SELECT DivideRate FROM C_UOM_Conversion WHERE M_Product_ID="+prod.getM_Product_ID()+" AND C_UOM_ID="+prod.getC_UOM_ID()+" AND C_UOM_To_ID="+C_UOM_ID;
+								BigDecimal multiplyrate = DB.getSQLValueBD(get_TrxName(), sql);
+								if(multiplyrate.compareTo(BigDecimal.ZERO)>0) {
+									BigDecimal base = getQtyUsed();
+									base = base.multiply(multiplyrate).setScale(UOM.getStdPrecision(), RoundingMode.HALF_UP);
+									setMovementQty(base.negate());
+								}
+							}else
+								setMovementQty(getQtyUsed().negate());
+						}else
+							setMovementQty(getQtyUsed().negate());
+						
+						if(is_ValueChanged("M_Product_ID")) {
+							cost = getPurchaseProductCost(getM_Product_ID(),getAD_Org_ID());
+							set_ValueOfColumn("PriceCost", cost);
+						}
+						setIsEndProduct(false);
+					}
+					//Update End Product Cost
+					String sqlU = "UPDATE M_ProductionLine pl SET PriceCost = pf.PriceCost/pf.productionqty FROM "
+							+ " (SELECT SUM(ppl.PriceCost*(ppl.movementqty*-1)) AS PriceCost, pp.productionqty AS productionqty, "
+								+ " CASE WHEN Discount>0 THEN (Discount/100) ELSE 1 END AS Discount FROM M_ProductionLine ppl "
+							+ " JOIN M_Production pp ON ppl.M_Production_ID=pp.M_Production_ID"
+							+ " WHERE ppl.M_Product_ID <> "+ productionParent.getM_Product_ID() +" AND ppl.M_Production_ID = "+getM_Production_ID()+" "
+									+ "GROUP BY pp.M_Production_ID,pp.productionqty,pp.Discount) pf"
+							+ " WHERE pl.M_Product_ID = "+ productionParent.getM_Product_ID() +" AND pl.M_Production_ID = " + getM_Production_ID();
+					if(is_ValueChanged("M_Product_ID")||is_ValueChanged("QtyUsed")||is_ValueChanged("movementqty")||is_new())
+						DB.executeUpdate(sqlU, get_TrxName());
+				}
 			}
 		} 
 		else 
@@ -354,7 +481,6 @@ public class FTUMProductionLine extends MProductionLine {
 			else 
 				setIsEndProduct(false);
 		}
-		
 		
 		
 		if ( isEndProduct() && getM_AttributeSetInstance_ID() != 0 )
@@ -375,13 +501,7 @@ public class FTUMProductionLine extends MProductionLine {
 		
 		if(getIsDerivative(getM_Product_ID()) == 1) {
 			setIsEndProduct(true);
-		}
-		
-		/*if ( !isEndProduct() )
-		{
-			setMovementQty(getQtyUsed().negate());
-		}*/
-		
+		}		
 		
 		return true;
 	}
@@ -398,4 +518,19 @@ public class FTUMProductionLine extends MProductionLine {
 		return DB.getSQLValueEx(get_TrxName(), sql);
 	}
 	
+	public BigDecimal getPurchaseProductCost (int M_Product_ID, int AD_Org_ID) {
+		MProduct p = new MProduct(getCtx(), M_Product_ID, get_TrxName());
+		MClientInfo ci = MClientInfo.get(getCtx(), getAD_Client_ID());
+		MCost c = p.getCostingRecord(ci.getMAcctSchema1(), AD_Org_ID, getM_AttributeSetInstance_ID());
+		if(c!=null && c.getCurrentCostPrice().compareTo(BigDecimal.ZERO)>0)
+			return c.getCurrentCostPrice();
+		
+		return BigDecimal.ZERO;
+	}
+	
+	@Override
+	protected boolean beforeDelete() {
+		deleteMA();
+		return true;
+	}
 }

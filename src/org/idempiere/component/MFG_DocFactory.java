@@ -18,6 +18,9 @@ import org.libero.tables.I_DD_Order;
 import org.libero.tables.I_PP_Cost_Collector; 
 import org.libero.tables.I_PP_Order;
 
+import net.frontuari.acct.Doc_Transformation;
+import net.frontuari.model.FTUMProduction;
+
 public class MFG_DocFactory implements IDocFactory {
 	private final static CLogger s_log = CLogger.getCLogger(MFG_DocFactory.class);
 
@@ -78,7 +81,10 @@ public class MFG_DocFactory implements IDocFactory {
 			{
 				return new Doc_PPCostCollector(as, rs, trxName);
 			}
-
+		if (tableName.equals(FTUMProduction.Table_Name))
+			{
+				return new Doc_Transformation(as, rs, trxName);
+			}
 
 		return null;
 	}
