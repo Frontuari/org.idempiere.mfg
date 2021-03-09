@@ -481,9 +481,9 @@ ValueChangeListener,Serializable,WTableModelListener
 			 			
 			if ( result == 1)
 			{				
-				final boolean isCloseDocument = (Messagebox.show(Msg.parseTranslation(Env.getCtx(),"@IsCloseDocument@: &&&&"+  getPP_Order().getDocumentNo()),"",Messagebox.OK|Messagebox.CANCEL,Messagebox.QUESTION) == Messagebox.OK);
+				//final boolean isCloseDocument = (Messagebox.show(Msg.parseTranslation(Env.getCtx(),"@IsCloseDocument@: &&&&"+  getPP_Order().getDocumentNo()),"",Messagebox.OK|Messagebox.CANCEL,Messagebox.QUESTION) == Messagebox.OK);
 
-				if (cmd_process(isCloseDocument, issue))
+				if (cmd_process(issue))
 				{
 					//dispose();
 					return;
@@ -901,7 +901,7 @@ ValueChangeListener,Serializable,WTableModelListener
 	{
 		//nothing
 	}
-	public boolean cmd_process(final boolean isCloseDocument, final IMiniTable issue)
+	public boolean cmd_process(final IMiniTable issue)
 	{
 
 		if (isOnlyReceipt() || isBackflush())
@@ -937,24 +937,24 @@ ValueChangeListener,Serializable,WTableModelListener
 								getM_Locator_ID(),
 								getM_AttributeSetInstance_ID()
 						);
-						if (isCloseDocument)
+						/*if (isCloseDocument)
 						{
 							order.setDateFinish(getMovementDate());
 							order.closeIt();
 							order.saveEx();
-						}
+						}*/
 					}
 					if(isOnlyProduction())
 					{
 						// Added by Jorge Colmenarez 2020-02-24 18:55, create production document
 						try {
 							createProduction(order,issue,getM_Locator_ID(),getToDeliverQty(),trxName, getM_AttributeSetInstance_ID(), getScrapQty());
-							if (isCloseDocument)
+							/*if (isCloseDocument)
 							{
 								order.setDateFinish(getMovementDate());
 								order.closeIt();
 								order.saveEx(trxName);
-							}
+							}*/
 						}
 						catch(Exception e) {
 							showMessage(e.getLocalizedMessage(), true);

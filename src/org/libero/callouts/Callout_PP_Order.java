@@ -4,7 +4,8 @@ import java.util.Properties;
 
 import org.adempiere.base.IColumnCallout;
 import org.compiere.model.GridField;
-import org.compiere.model.GridTab; 
+import org.compiere.model.GridTab;
+import org.eevolution.model.X_PP_Order; 
 
 public class Callout_PP_Order extends CalloutOrder implements IColumnCallout {
 
@@ -20,6 +21,9 @@ public class Callout_PP_Order extends CalloutOrder implements IColumnCallout {
 		
 		if (mField.getColumnName().equals("C_DocTypeTarget_ID"))
 			return doctype(ctx, WindowNo, mTab, mField,value);
+		
+		if (X_PP_Order.COLUMNNAME_S_Resource_ID.equals(mField.getColumnName()))
+			return resource(ctx, WindowNo, mTab, mField, value);
 		return null;
 	}
 

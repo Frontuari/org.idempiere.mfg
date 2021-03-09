@@ -39,6 +39,8 @@ public class MPPOrderBOMLine extends X_PP_Order_BOMLine
 {
 	private static final long serialVersionUID = 1L;
 	
+	public static String COLUMNNAME_QtyLost = "QtyLost";
+	
 	public static MPPOrderBOMLine forM_Product_ID(Properties ctx, int PP_Order_ID, int M_Product_ID, String trxName)
 	{
 		//TODO: vpj-cd What happen when a product it more the time in Order
@@ -161,14 +163,14 @@ public class MPPOrderBOMLine extends X_PP_Order_BOMLine
 			setQtyRequired(getQtyRequired().setScale(precision, RoundingMode.UP));
 		}
 		
-		if((is_ValueChanged(MPPOrderBOMLine.COLUMNNAME_QtyDelivered)
+		/*if((is_ValueChanged(MPPOrderBOMLine.COLUMNNAME_QtyDelivered)
 				|| is_ValueChanged(MPPOrderBOMLine.COLUMNNAME_QtyRequired)) 
 				//	Added by Jorge Colmenarez 2020-02-24 12:09 support for check document status before reserve stock
 				&& !getPP_Order_BOM().getPP_Order().getDocStatus().equals(MPPOrder.DOCSTATUS_Drafted))
 				// End Jorge Colmenarez
 		{	
 			reserveStock();
-		}
+		}*/
 		
 		return true;
 	}
@@ -511,7 +513,32 @@ public class MPPOrderBOMLine extends X_PP_Order_BOMLine
 	{
 		if(getPP_Order().getDocAction().equals(MPPOrder.DOCACTION_Close))
 		{
+			BigDecimal qtyReserved = getQtyReserved().negate();
 			setQtyReserved(Env.ZERO);
+			
+			if (BigDecimal.ZERO.compareTo(qtyReserved) == 0)
+				return ;
+			
+			MPPOrder pporder = new MPPOrder(getCtx(), getPP_Order_ID(), get_TrxName());
+			
+			if(pporder.get_ValueAsBoolean("IsMovementAutomatic") && !get_ValueAsBoolean("IsRacking")) 
+			{
+				boolean rsv1 = MStorageReservation.add(getCtx(), get_ValueAsInt("M_WarehouseSource_ID"), getM_Product_ID(), 
+						getM_AttributeSetInstance_ID(), qtyReserved, getPP_Order().getC_DocType().isSOTrx(), get_TrxName());
+				boolean rsv2 = MStorageReservation.add(getCtx(), getM_Warehouse_ID(), getM_Product_ID(), 
+						getM_AttributeSetInstance_ID(), qtyReserved, !getPP_Order().getC_DocType().isSOTrx(), get_TrxName());
+				if(!rsv1 || !rsv2)
+				{
+					throw new AdempiereException("Storage Update  Error!");
+				}	
+			}
+			else if (!pporder.get_ValueAsBoolean("IsMovementAutomatic")
+					&& !MStorageReservation.add(getCtx(), getM_Warehouse_ID()
+							, getM_Product_ID(), getM_AttributeSetInstance_ID()
+							, qtyReserved, !get_ValueAsBoolean("IsDerivative")
+							, get_TrxName()))
+				throw new AdempiereException("Storage Update  Error!");
+			
 			return;
 		}
 		
@@ -564,6 +591,12 @@ public class MPPOrderBOMLine extends X_PP_Order_BOMLine
 				throw new AdempiereException("Storage Update  Error!");
 			}	
 		}
+		else if (!pporder.get_ValueAsBoolean("IsMovementAutomatic")
+				&& !MStorageReservation.add(getCtx(), getM_Warehouse_ID()
+						, getM_Product_ID(), getM_AttributeSetInstance_ID()
+						, reserved, !get_ValueAsBoolean("IsDerivative")
+						, get_TrxName()))
+			throw new AdempiereException("Storage Update  Error!");
 		
 		/*if(!MStorageReservation.add(getCtx(), getM_Warehouse_ID(), getM_Product_ID(), 
 				getM_AttributeSetInstance_ID(), reserved, getPP_Order().getC_DocType().isSOTrx(), get_TrxName()))
