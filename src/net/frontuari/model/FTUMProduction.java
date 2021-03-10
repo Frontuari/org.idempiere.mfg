@@ -557,6 +557,46 @@ public class FTUMProduction extends MProduction {
 		return retValue;
 	}
 	
+
+	
+	public FTUMProductionLine[] getLines(String whereClause) {
+		ArrayList<FTUMProductionLine> list = new ArrayList<FTUMProductionLine>();
+		
+		String sql = "SELECT pl.M_ProductionLine_ID "
+			+ "FROM M_ProductionLine pl "
+			+ "WHERE pl.M_Production_ID = ?";
+		
+		if(whereClause != "" && !whereClause.isEmpty())
+		{
+			sql = sql+whereClause;
+		}
+		
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		try
+		{
+			pstmt = DB.prepareStatement(sql, get_TrxName());
+			pstmt.setInt(1, get_ID());
+			rs = pstmt.executeQuery();
+			while (rs.next())
+				list.add( new FTUMProductionLine( getCtx(), rs.getInt(1), get_TrxName() ) );	
+		}
+		catch (SQLException ex)
+		{
+			throw new AdempiereException("Unable to load production lines", ex);
+		}
+		finally
+		{
+			DB.close(rs, pstmt);
+			rs = null;
+			pstmt = null;
+		}
+		
+		FTUMProductionLine[] retValue = new FTUMProductionLine[list.size()];
+		list.toArray(retValue);
+		return retValue;
+	}
+	
 	@Override
 	public boolean voidIt() {
 		if (log.isLoggable(Level.INFO)) log.info(toString());
@@ -954,7 +994,6 @@ public class FTUMProduction extends MProduction {
 
 		// product to be produced
 		MProduct finishedProduct = new MProduct(getCtx(), getM_Product_ID(), get_TrxName());
-				
 		
 		BigDecimal MovementQty = getProductionQty();
 		

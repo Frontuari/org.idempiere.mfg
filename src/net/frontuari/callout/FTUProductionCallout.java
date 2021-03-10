@@ -20,10 +20,13 @@ public class FTUProductionCallout implements IColumnCallout {
 		
 		if (FTUMProduction.COLUMNNAME_M_Product_ID.equals(mField.getColumnName()))
 		{
-			int M_Product_ID = (int)value;
-			if(M_Product_ID>0) {
-				MProduct prod = new MProduct(ctx,M_Product_ID,null);
-				mTab.setValue("C_UOM_ID", prod.getC_UOM_ID());
+			if(value != null)
+			{
+				int M_Product_ID = (int)value;
+				if(M_Product_ID>0) {
+					MProduct prod = new MProduct(ctx,M_Product_ID,null);
+					mTab.setValue("C_UOM_ID", prod.getC_UOM_ID());
+				}
 			}
 		}
 		
