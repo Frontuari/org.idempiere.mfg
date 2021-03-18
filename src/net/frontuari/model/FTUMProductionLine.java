@@ -548,11 +548,14 @@ public class FTUMProductionLine extends MProductionLine {
 						setMovementQty(movementQty);
 
 					if(is_ValueChanged("M_Product_ID")) {
-						cost = getPurchaseProductCost(productionParent.getM_Product_ID(),getAD_Org_ID());
-						cost = cost.multiply(getQtyUsed()).setScale(UOM.getCostingPrecision(), RoundingMode.HALF_UP);
-						cost = cost.divide(movementQty, UOM.getCostingPrecision(), RoundingMode.HALF_UP);						
-						if(cost.compareTo(BigDecimal.ZERO)>0)
-							set_ValueOfColumn("PriceCost", cost);
+						if(movementQty.compareTo(BigDecimal.ZERO) != 0)
+						{
+							cost = getPurchaseProductCost(productionParent.getM_Product_ID(),getAD_Org_ID());
+							cost = cost.multiply(getQtyUsed()).setScale(UOM.getCostingPrecision(), RoundingMode.HALF_UP);
+							cost = cost.divide(movementQty, UOM.getCostingPrecision(), RoundingMode.HALF_UP);						
+							if(cost.compareTo(BigDecimal.ZERO)>0)
+								set_ValueOfColumn("PriceCost", cost);
+						}
 					}
 					
 				}

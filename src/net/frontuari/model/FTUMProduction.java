@@ -119,26 +119,29 @@ public class FTUMProduction extends MProduction {
 		if ( getIsCreated().equals("N") )
 		{
 			//	m_processMsg = "Not created";
-			if(isTransformation){
+			if(isTransformation && !get_ValueAsBoolean("IsManual")){
 				m_processMsg = "Debe crear las lineas o actualizarlas(Recrearlas) en caso de haber cambiado la cantidad a transformar";
 				return DocAction.STATUS_Invalid; 
-			}else {
+			}else if (!isTransformation) {
 				m_processMsg = "Debe crear las lineas o actualizarlas(Recrearlas) en caso de haber cambiado la cantidad a producir";
 				return DocAction.STATUS_Invalid; 
 			} 
 		}
 		//	Validate Stock on Transformation Transaction
 		if(isTransformation){
-			String sql = "SELECT COALESCE(SUM(QtyOnHand-QtyReserved),0) FROM M_Storage  WHERE M_Product_ID = "+getM_Product_ID()+" AND AD_Org_ID = "+getAD_Org_ID()+" AND M_Locator_ID="+getM_Locator_ID();
-			BigDecimal qty = DB.getSQLValueBD(get_TrxName(), sql);
-			if(qty!=null){
-				if(qty.compareTo(getProductionQty())<0){
-					m_processMsg = "La cantidad a transformar es menor a la cantidad disponible en el almacen y la ubicacion seleccionada";
-					return DocAction.STATUS_Invalid; 
+			if(!get_ValueAsBoolean("IsManual"))
+			{
+				String sql = "SELECT COALESCE(SUM(QtyOnHand-QtyReserved),0) FROM M_Storage  WHERE M_Product_ID = "+getM_Product_ID()+" AND AD_Org_ID = "+getAD_Org_ID()+" AND M_Locator_ID="+getM_Locator_ID();
+				BigDecimal qty = DB.getSQLValueBD(get_TrxName(), sql);
+				if(qty!=null){
+					if(qty.compareTo(getProductionQty())<0){
+						m_processMsg = "La cantidad a transformar es menor a la cantidad disponible en el almacen y la ubicacion seleccionada";
+						return DocAction.STATUS_Invalid; 
+					}
 				}
+				//	Validate Production
+				ValidateProduction((MProduct)getM_Product());
 			}
-			//	Validate Production
-			ValidateProduction((MProduct)getM_Product());
 		}
 
 		if (!isUseProductionPlan()) {
@@ -1139,32 +1142,31 @@ public class FTUMProduction extends MProduction {
 					throw new AdempiereException("El Producto hijo no tiene factor de conversión");
 				}
 				
-				if (!bomproduct.isStocked() || BOMMovementQty.signum() == 0) {		
-				FTUMProductionLine line = new FTUMProductionLine(this);
-				line.setLine( lineno );
-				line.setM_Product_ID(BOMProduct_ID);
-				line.setM_Locator_ID(defaultLocator);
-				line.setMovementQty(BOMMovementQty);
-				line.setPlannedQty(BOMMovementQty);
-				line.setQtyUsed(BOMMovementQty);
-				line.set_ValueOfColumn("MultiplyRate", factor);
-				if(C_UOM_ID>0)
-					line.set_ValueOfColumn("C_UOM_ID", C_UOM_ID);
-				line.setIsEndProduct(true);
-				line.saveEx();
-				lineno = lineno + 10;
-				count++;
+				// BOM stock info
+				MProduct usedProduct = MProduct.get(getCtx(), BOMProduct_ID);
+				defaultLocator = usedProduct.getM_Locator_ID();
+				if ( defaultLocator == 0 )
+					defaultLocator = getM_Locator_ID();
+				if (usedProduct == null || usedProduct.get_ID() == 0)
+					return 0;
 				
-				} else {
-
-					// BOM stock info
-					MProduct usedProduct = MProduct.get(getCtx(), BOMProduct_ID);
-					defaultLocator = usedProduct.getM_Locator_ID();
-					if ( defaultLocator == 0 )
-						defaultLocator = getM_Locator_ID();
-					if (usedProduct == null || usedProduct.get_ID() == 0)
-						return 0;
-					
+				if (!bomproduct.isStocked() || BOMMovementQty.signum() == 0) {		
+					FTUMProductionLine line = new FTUMProductionLine(this);
+					line.setLine( lineno );
+					line.setM_Product_ID(BOMProduct_ID);
+					line.setM_Locator_ID(defaultLocator);
+					line.setMovementQty(BOMMovementQty);
+					line.setPlannedQty(BOMMovementQty);
+					line.setQtyUsed(BOMMovementQty);
+					line.set_ValueOfColumn("MultiplyRate", factor);
+					if(C_UOM_ID>0)
+						line.set_ValueOfColumn("C_UOM_ID", C_UOM_ID);
+					line.setIsEndProduct(true);
+					line.saveEx();
+					lineno = lineno + 10;
+					count++;
+				
+				} else {					
 					FTUMProductionLine line = new FTUMProductionLine( this );
 					line.setLine( lineno );
 					line.setM_Product_ID(BOMProduct_ID);
@@ -1176,7 +1178,6 @@ public class FTUMProduction extends MProduction {
 					if(C_UOM_ID>0)
 						line.set_ValueOfColumn("C_UOM_ID", C_UOM_ID);
 					line.setIsEndProduct(true);
-					//line.setDescription("P:"+BOMProduct_ID+" MQ:"+BOMMovementQty+" ,");
 					
 					line.saveEx();
 					lineno = lineno + 10;
