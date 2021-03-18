@@ -1412,6 +1412,7 @@ public class FTUMProduction extends MProduction {
 	
 	@Override
 	protected boolean beforeSave(boolean newRecord) {
+		boolean isTransformation = false;
 		if (getM_Product_ID() > 0) {
 			if (isUseProductionPlan()) {
 				setIsUseProductionPlan(false);
@@ -1421,9 +1422,17 @@ public class FTUMProduction extends MProduction {
 				setIsUseProductionPlan(true);
 			}
 		}
-		
-		if(is_ValueChanged(COLUMNNAME_ProductionQty)||is_ValueChanged(COLUMNNAME_M_Product_ID)) {
-			setIsCreated("N");
+		//	Get TrxType
+		if(get_ValueAsString("TrxType") != "" && get_ValueAsString("TrxType").equalsIgnoreCase("T"))
+		{
+			isTransformation = true;
+		}
+		//	Validation only for Transformation
+		if(isTransformation)
+		{
+			if(is_ValueChanged(COLUMNNAME_ProductionQty)||is_ValueChanged(COLUMNNAME_M_Product_ID)) {
+				setIsCreated("N");
+			}
 		}
 			
 		return true;

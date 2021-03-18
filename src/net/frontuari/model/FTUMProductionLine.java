@@ -593,16 +593,19 @@ public class FTUMProductionLine extends MProductionLine {
 						}
 						setIsEndProduct(false);
 					}
-					//Update End Product Cost
-					String sqlU = "UPDATE M_ProductionLine pl SET PriceCost = pf.PriceCost/pf.productionqty FROM "
-							+ " (SELECT SUM(ppl.PriceCost*(ppl.movementqty*-1)) AS PriceCost, pp.productionqty AS productionqty, "
-								+ " CASE WHEN Discount>0 THEN (Discount/100) ELSE 1 END AS Discount FROM M_ProductionLine ppl "
-							+ " JOIN M_Production pp ON ppl.M_Production_ID=pp.M_Production_ID"
-							+ " WHERE ppl.M_Product_ID <> "+ productionParent.getM_Product_ID() +" AND ppl.M_Production_ID = "+getM_Production_ID()+" "
-									+ "GROUP BY pp.M_Production_ID,pp.productionqty,pp.Discount) pf"
-							+ " WHERE pl.M_Product_ID = "+ productionParent.getM_Product_ID() +" AND pl.M_Production_ID = " + getM_Production_ID();
-					if(is_ValueChanged("M_Product_ID")||is_ValueChanged("QtyUsed")||is_ValueChanged("movementqty")||is_new())
-						DB.executeUpdate(sqlU, get_TrxName());
+					if(isTransformation)
+					{
+						//Update End Product Cost
+						String sqlU = "UPDATE M_ProductionLine pl SET PriceCost = pf.PriceCost/pf.productionqty FROM "
+								+ " (SELECT SUM(ppl.PriceCost*(ppl.movementqty*-1)) AS PriceCost, pp.productionqty AS productionqty, "
+									+ " CASE WHEN Discount>0 THEN (Discount/100) ELSE 1 END AS Discount FROM M_ProductionLine ppl "
+								+ " JOIN M_Production pp ON ppl.M_Production_ID=pp.M_Production_ID"
+								+ " WHERE ppl.M_Product_ID <> "+ productionParent.getM_Product_ID() +" AND ppl.M_Production_ID = "+getM_Production_ID()+" "
+										+ "GROUP BY pp.M_Production_ID,pp.productionqty,pp.Discount) pf"
+								+ " WHERE pl.M_Product_ID = "+ productionParent.getM_Product_ID() +" AND pl.M_Production_ID = " + getM_Production_ID();
+						if(is_ValueChanged("M_Product_ID")||is_ValueChanged("QtyUsed")||is_ValueChanged("movementqty")||is_new())
+							DB.executeUpdate(sqlU, get_TrxName());
+					}
 				}
 			}
 		} 
