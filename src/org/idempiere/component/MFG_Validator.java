@@ -175,13 +175,13 @@ public class MFG_Validator extends AbstractEventHandler {
 							, production.get_ValueAsInt(X_PP_Order.COLUMNNAME_PP_Order_ID)
 							, production.get_TrxName());
 					
-					if (!order.processIt(MPPOrder.ACTION_Close))
+				/*	if (!order.processIt(MPPOrder.ACTION_Close))
 						throw new AdempiereException("Could not Close PP_Order [" + order.getProcessMsg() + "]");
 					
 					if (order.getDateFinish() == null)
 						order.setDateFinish(new Timestamp(System.currentTimeMillis()));
 					
-					order.saveEx();
+					order.saveEx();*/
 				}
 			}
 			
