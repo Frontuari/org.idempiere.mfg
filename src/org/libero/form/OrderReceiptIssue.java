@@ -1000,6 +1000,10 @@ public class OrderReceiptIssue extends GenForm {
 		production.setUser2_ID(order.getUser2_ID());
 		production.setIsUseProductionPlan(false);
 		production.set_ValueOfColumn("PP_Product_BOM_ID", order.get_Value("PP_Product_BOM_ID"));
+		//	Added by Jorge Colmenarez, 2021-03-28 13:05
+		//	Set UOM from Product
+		production.set_ValueOfColumn("C_UOM_ID", order.getM_Product().getC_UOM_ID());
+		//	End Jorge Colmenarez
 		production.saveEx(trxName);
 		
 		int lineNumber = 10;
@@ -1015,6 +1019,11 @@ public class OrderReceiptIssue extends GenForm {
 		
 		 mpl1.set_ValueOfColumn("M_AttributeSetInstance_ID", AttributeSetInstance_ID);
 		 mpl1.set_ValueOfColumn("ScrappedQty", ScrapQty);
+		 
+		 //	Added by Jorge Colmenarez, 2021-03-28 13:05
+		 //	Set UOM from Product
+		 mpl1.set_ValueOfColumn("C_UOM_ID", order.getM_Product().getC_UOM_ID());
+		 //	End Jorge Colmenarez
 		 
 		 mpl1.saveEx(trxName);
 		 
@@ -1064,7 +1073,6 @@ public class OrderReceiptIssue extends GenForm {
 				 mpl.setM_Locator_ID(locatorID);
 				 mpl.setPlannedQty(lines[0].getQtyRequired());
 				 mpl.set_ValueOfColumn(MPPOrderBOMLine.COLUMNNAME_PP_Order_BOMLine_ID, key.getKey());
-				 System.out.println(m_issue[i][0].get(5));
 				 mpl.set_ValueOfColumn("ScrappedQty",m_issue[i][0].get(5));
 				 if(lines[0].get_ValueAsBoolean("IsDerivative")) {
 					 mpl.setIsEndProduct(true);
@@ -1074,6 +1082,11 @@ public class OrderReceiptIssue extends GenForm {
 					 mpl.setQtyUsed(qtyLine);
 					 mpl.setMovementQty(qtyLine.negate());
 				 }
+				 
+				 //	Added by Jorge Colmenarez, 2021-03-28 13:05
+				 //	Set UOM from Product
+				 mpl.set_ValueOfColumn("C_UOM_ID", lines[i].getM_Product().getC_UOM_ID());
+				 //	End Jorge Colmenarez
 				
 				 mpl.saveEx(trxName);
 				 

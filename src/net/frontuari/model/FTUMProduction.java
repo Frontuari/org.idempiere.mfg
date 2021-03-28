@@ -1423,8 +1423,12 @@ public class FTUMProduction extends MProduction {
 			}
 		}
 		
-		if(is_ValueChanged(COLUMNNAME_ProductionQty)||is_ValueChanged(COLUMNNAME_M_Product_ID)) {
-			setIsCreated("N");
+		boolean isTransformation = get_ValueAsString("TrxType").equalsIgnoreCase("T");
+		if(isTransformation)
+		{
+			if(is_ValueChanged(COLUMNNAME_ProductionQty)||is_ValueChanged(COLUMNNAME_M_Product_ID)) {
+				setIsCreated("N");
+			}
 		}
 			
 		return true;
