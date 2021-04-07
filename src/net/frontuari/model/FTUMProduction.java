@@ -717,8 +717,9 @@ public class FTUMProduction extends MProduction {
 		int asi = 0;
 
 		// products used in production
-		String sql = "SELECT M_Product_ID, QtyBOM, C_UOM_ID,IsQtyPercentage, IsDerivative" + " FROM PP_Product_BOMLine"
-				+ " WHERE PP_Product_BOM_ID=" + PP_Product_BOM_ID + " ORDER BY Line";
+		String sql = "SELECT bl.M_Product_ID, bl.QtyBOM / (CASE WHEN bl.IsQtyPercentage = 'Y' THEN 1 ELSE b.ProductionQty END) AS QtyBOM, bl.C_UOM_ID,bl.IsQtyPercentage, bl.IsDerivative" + " FROM PP_Product_BOMLine bl "
+				+ "	JOIN PP_Product_BOM b ON bl.PP_Product_BOM_ID = b.PP_Product_BOM_ID "
+				+ " WHERE bl.PP_Product_BOM_ID=" + PP_Product_BOM_ID + " ORDER BY bl.Line";
 
 		PreparedStatement pstmt = null;
 		ResultSet rs = null;
@@ -1036,55 +1037,71 @@ public class FTUMProduction extends MProduction {
 		FTUMProductionLine Line = null;
 		int prevLoc = -1;
 		int previousAttribSet = -1;
-		// Create lines from storage until qty is reached
-		for (int sl = 0; sl < storages.length; sl++) {
-			BigDecimal lineQty = storages[sl].getQtyOnHand();
-			if (lineQty.signum() != 0) {
-				if (lineQty.compareTo(MovementQty) > 0)
-					lineQty = MovementQty;
+		if(mustBeStocked)
+		{
+			// Create lines from storage until qty is reached
+			for (int sl = 0; sl < storages.length; sl++) {
+				BigDecimal lineQty = storages[sl].getQtyOnHand();
+				if (lineQty.signum() != 0) {
+					if (lineQty.compareTo(MovementQty) > 0)
+						lineQty = MovementQty;
 
-				int loc = storages[sl].getM_Locator_ID();
-				int slASI = storages[sl].getM_AttributeSetInstance_ID();
-				int locAttribSet = new MAttributeSetInstance(getCtx(), asi,
-						get_TrxName()).getM_AttributeSet_ID();
+					int loc = storages[sl].getM_Locator_ID();
+					int slASI = storages[sl].getM_AttributeSetInstance_ID();
+					int locAttribSet = new MAttributeSetInstance(getCtx(), asi,
+							get_TrxName()).getM_AttributeSet_ID();
 
-				// roll up costing attributes if in the same locator
-				if (locAttribSet == 0 && previousAttribSet == 0
-						&& prevLoc == loc) {
-					Line.setQtyUsed(Line.getQtyUsed()
-							.add(lineQty));
-					Line.setPlannedQty(Line.getQtyUsed());
-					Line.setMovementQty(Line.getQtyUsed().negate());
-					Line.saveEx(get_TrxName());
+					// roll up costing attributes if in the same locator
+					if (locAttribSet == 0 && previousAttribSet == 0
+							&& prevLoc == loc) {
+						Line.setQtyUsed(Line.getQtyUsed()
+								.add(lineQty));
+						Line.setPlannedQty(Line.getQtyUsed());
+						Line.setMovementQty(Line.getQtyUsed().negate());
+						Line.saveEx(get_TrxName());
 
+					}
+					// otherwise create new line
+					else {
+						Line = new FTUMProductionLine(this);
+						Line.setLine(lineno);
+						Line.setM_Product_ID(finishedProduct.get_ID());
+						Line.setM_Locator_ID(loc);
+						Line.setQtyUsed(ConversionRate.compareTo(BigDecimal.ZERO)>0?lineQty.divide(ConversionRate,6, RoundingMode.HALF_UP):lineQty);
+						Line.setPlannedQty(lineQty);
+						Line.setMovementQty(lineQty.negate());
+						Line.setIsEndProduct(false);
+						if(C_UOM_ID>0)
+							Line.set_ValueOfColumn("C_UOM_ID", C_UOM_ID);
+						if (slASI != 0 && locAttribSet != 0)  // ie non costing attribute
+							Line.setM_AttributeSetInstance_ID(slASI);
+						Line.saveEx(get_TrxName());
+
+					}
+					prevLoc = loc;
+					previousAttribSet = locAttribSet;
+					// enough ?
+					MovementQty = MovementQty.subtract(lineQty);
+					if (MovementQty.signum() == 0)
+						break;
 				}
-				// otherwise create new line
-				else {
-					Line = new FTUMProductionLine(this);
-					Line.setLine(lineno);
-					Line.setM_Product_ID(finishedProduct.get_ID());
-					Line.setM_Locator_ID(loc);
-					Line.setQtyUsed(ConversionRate.compareTo(BigDecimal.ZERO)>0?lineQty.divide(ConversionRate,6, RoundingMode.HALF_UP):lineQty);
-					Line.setPlannedQty(lineQty);
-					Line.setMovementQty(lineQty.negate());
-					Line.setIsEndProduct(false);
-					if(C_UOM_ID>0)
-						Line.set_ValueOfColumn("C_UOM_ID", C_UOM_ID);
-					if (slASI != 0 && locAttribSet != 0)  // ie non costing attribute
-						Line.setM_AttributeSetInstance_ID(slASI);
-					Line.saveEx(get_TrxName());
-
-				}
-				prevLoc = loc;
-				previousAttribSet = locAttribSet;
-				// enough ?
-				MovementQty = MovementQty.subtract(lineQty);
-				if (MovementQty.signum() == 0)
-					break;
+			}
+			if(storages.length == 0) {
+				throw new AdempiereException("El producto ["+finishedProduct.getName()+"] no tiene cantidad disponible en la ubicacion ["+finishedLocator.getValue()+"]");
 			}
 		}
-		if(storages.length == 0) {
-			throw new AdempiereException("El producto ["+finishedProduct.getName()+"] no tiene cantidad disponible en la ubicacion ["+finishedLocator.getValue()+"]");
+		else {
+			Line = new FTUMProductionLine(this);
+			Line.setLine(lineno);
+			Line.setM_Product_ID(finishedProduct.get_ID());
+			Line.setM_Locator_ID(getM_Locator_ID());
+			Line.setQtyUsed(ConversionRate.compareTo(BigDecimal.ZERO)>0?ProductionQty.divide(ConversionRate,6, RoundingMode.HALF_UP):ProductionQty);
+			Line.setPlannedQty(ProductionQty);
+			Line.setMovementQty(ProductionQty.negate());
+			Line.setIsEndProduct(false);
+			if(C_UOM_ID>0)
+				Line.set_ValueOfColumn("C_UOM_ID", C_UOM_ID);
+			Line.saveEx(get_TrxName());
 		}
 		
 		count ++;

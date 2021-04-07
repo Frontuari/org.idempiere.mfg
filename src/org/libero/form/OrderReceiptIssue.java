@@ -1065,6 +1065,8 @@ public class OrderReceiptIssue extends GenForm {
 				//BigDecimal scpQty = (BigDecimal) m_issue[i][0].get(9);
 				//	Only one record
 				MPPOrderBOMLine[] lines = order.getLines(true,"M_Product_ID = "+productID);
+				//	Create Product Object
+				MProduct p = new MProduct(Env.getCtx(), productID, null);
 				
 				FTUMProductionLine mpl = new FTUMProductionLine(production);
 				 mpl.setAD_Org_ID(order.getAD_Org_ID());
@@ -1085,7 +1087,7 @@ public class OrderReceiptIssue extends GenForm {
 				 
 				 //	Added by Jorge Colmenarez, 2021-03-28 13:05
 				 //	Set UOM from Product
-				 mpl.set_ValueOfColumn("C_UOM_ID", lines[i].getM_Product().getC_UOM_ID());
+				 mpl.set_ValueOfColumn("C_UOM_ID", p.getC_UOM_ID());
 				 //	End Jorge Colmenarez
 				
 				 mpl.saveEx(trxName);

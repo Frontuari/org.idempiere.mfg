@@ -972,7 +972,10 @@ public class MPPOrder extends X_PP_Order implements DocAction
 		
 		updateLineQty();
 		updateHeaderQty();
-		
+		//	Added by Jorge Colmenarez, 2021-04-05 09:34
+		//	Support for free PPOrder from MRP
+		DB.executeUpdate("DELETE FROM PP_MRP WHERE PP_Order_ID = ?", get_ID(), get_TrxName());
+		//	End Jorge Colmenarez
 		setDocAction(DOCACTION_Complete);
 		setProcessed(false);
 		return true;

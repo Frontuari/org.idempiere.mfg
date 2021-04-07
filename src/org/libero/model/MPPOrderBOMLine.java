@@ -82,13 +82,31 @@ public class MPPOrderBOMLine extends X_PP_Order_BOMLine
 		setPP_Order_BOM_ID(PP_Order_BOM_ID);
 		setPP_Order_ID(PP_Order_ID);
 		setM_Warehouse_ID(M_Warehouse_ID);
+		
+		//	Added by Jorge Colmenarez, 2021-03-31 16:08
+		//	Get ProductionQty from Receipt
+		MPPProductBOM pbom = new MPPProductBOM(getCtx(), getParent().getPP_Product_BOM_ID(), trxName);
+		BigDecimal dividen = (BigDecimal) pbom.get_Value("ProductionQty");
+		if(dividen == null || dividen.compareTo(BigDecimal.ZERO) == 0)
+			dividen = BigDecimal.ONE;
+		
+		BigDecimal qtyBom = BigDecimal.ZERO;
+		if(bomLine.isQtyPercentage())
+		{
+			qtyBom = bomLine.getQtyBOM();
+		}
+		else
+		{
+			qtyBom = bomLine.getQtyBOM().divide(dividen, 10, RoundingMode.HALF_UP);
+		}
+		//	End Jorge Colmenarez
 		//
 		setM_ChangeNotice_ID(bomLine.getM_ChangeNotice_ID());
 		setDescription(bomLine.getDescription());
 		setHelp(bomLine.getHelp());
 		setAssay(bomLine.getAssay());
 		setQtyBatch(bomLine.getQtyBatch());
-		setQtyBOM(bomLine.getQtyBOM());
+		setQtyBOM(qtyBom);
 		setIsQtyPercentage(bomLine.isQtyPercentage());
 		setComponentType(bomLine.getComponentType());
 		setC_UOM_ID(bomLine.getC_UOM_ID());
@@ -293,6 +311,7 @@ public class MPPOrderBOMLine extends X_PP_Order_BOMLine
 		else
 		{
 			qty = getQtyBOM();
+			//	End Jorge Colmenarez
 		}
 		return qty;
 	}
