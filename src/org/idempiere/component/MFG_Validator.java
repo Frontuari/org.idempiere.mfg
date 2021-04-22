@@ -78,8 +78,8 @@ public class MFG_Validator extends AbstractEventHandler {
 	protected void initialize() {
 		registerEvent(IEventTopics.AFTER_LOGIN);
 		registerTableEvent(IEventTopics.PO_BEFORE_NEW, I_M_Movement.Table_Name);
-		registerTableEvent(IEventTopics.PO_AFTER_NEW, I_C_Order.Table_Name);
-		registerTableEvent(IEventTopics.PO_AFTER_NEW, I_C_OrderLine.Table_Name);
+		//registerTableEvent(IEventTopics.PO_AFTER_NEW, I_C_Order.Table_Name);
+		//registerTableEvent(IEventTopics.PO_AFTER_NEW, I_C_OrderLine.Table_Name);
 		registerTableEvent(IEventTopics.PO_AFTER_NEW, I_M_Requisition.Table_Name);
 		registerTableEvent(IEventTopics.PO_AFTER_NEW, I_M_RequisitionLine.Table_Name);
 		registerTableEvent(IEventTopics.PO_AFTER_NEW, I_M_Forecast.Table_Name);
@@ -88,11 +88,9 @@ public class MFG_Validator extends AbstractEventHandler {
 		registerTableEvent(IEventTopics.PO_AFTER_NEW, I_DD_OrderLine.Table_Name);
 		registerTableEvent(IEventTopics.PO_AFTER_NEW, I_PP_Order.Table_Name);
 		registerTableEvent(IEventTopics.PO_AFTER_NEW, I_PP_Order_BOMLine.Table_Name);
-		registerTableEvent(IEventTopics.PO_AFTER_NEW, I_C_Order.Table_Name);
-		registerTableEvent(IEventTopics.PO_AFTER_NEW, I_C_Order.Table_Name);
 		registerTableEvent(IEventTopics.PO_BEFORE_CHANGE, I_M_Product.Table_Name); 
-		registerTableEvent(IEventTopics.PO_AFTER_CHANGE, I_C_Order.Table_Name);
-		registerTableEvent(IEventTopics.PO_AFTER_CHANGE, I_C_OrderLine.Table_Name);
+		//registerTableEvent(IEventTopics.PO_AFTER_CHANGE, I_C_Order.Table_Name);
+		//registerTableEvent(IEventTopics.PO_AFTER_CHANGE, I_C_OrderLine.Table_Name);
 		registerTableEvent(IEventTopics.PO_AFTER_CHANGE, I_M_Requisition.Table_Name);
 		registerTableEvent(IEventTopics.PO_AFTER_CHANGE, I_M_RequisitionLine.Table_Name);
 		registerTableEvent(IEventTopics.PO_AFTER_CHANGE, I_M_Forecast.Table_Name);
@@ -103,8 +101,8 @@ public class MFG_Validator extends AbstractEventHandler {
 		registerTableEvent(IEventTopics.PO_AFTER_CHANGE, I_PP_Order_BOMLine.Table_Name);
 		registerTableEvent(IEventTopics.PO_AFTER_CHANGE, I_M_Forecast.Table_Name);
 		registerTableEvent(IEventTopics.PO_AFTER_CHANGE, I_M_ForecastLine.Table_Name);
-		registerTableEvent(IEventTopics.PO_BEFORE_DELETE, I_C_Order.Table_Name);
-		registerTableEvent(IEventTopics.PO_BEFORE_DELETE, I_C_OrderLine.Table_Name);
+		//registerTableEvent(IEventTopics.PO_BEFORE_DELETE, I_C_Order.Table_Name);
+		//registerTableEvent(IEventTopics.PO_BEFORE_DELETE, I_C_OrderLine.Table_Name);
 		registerTableEvent(IEventTopics.PO_BEFORE_DELETE, I_M_Requisition.Table_Name);
 		registerTableEvent(IEventTopics.PO_BEFORE_DELETE, I_M_RequisitionLine.Table_Name);
 		registerTableEvent(IEventTopics.PO_BEFORE_DELETE, I_M_Forecast.Table_Name);
