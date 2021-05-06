@@ -18,15 +18,12 @@ import org.compiere.model.MCostDetail;
 import org.compiere.model.MCurrency;
 import org.compiere.model.MFactAcct;
 import org.compiere.model.MProduct;
-import org.compiere.model.MProductionLine;
 import org.compiere.model.MProductionLineMA;
 import org.compiere.model.ProductCost;
 import org.compiere.model.X_M_Production;
 import org.compiere.model.X_M_ProductionLine;
 import org.compiere.util.DB;
 import org.compiere.util.Env;
-
-import net.frontuari.model.FTUMProductionLine;
 
 public class Doc_Transformation extends Doc_Production{
 	
@@ -215,7 +212,6 @@ public class Doc_Transformation extends Doc_Production{
 			  MCostDetail cd = MCostDetail.get (as.getCtx(), "M_ProductionLine_ID=?",
 					  prodLine.get_ID(), parentLine.getM_AttributeSetInstance_ID(), as.getC_AcctSchema_ID(), getTrxName());
 				if (cd != null) {
-					System.out.println(cd.get_ID()+"-"+cd.getM_ProductionLine_ID());
 					costs = cd.getAmt();
 					
 					/*

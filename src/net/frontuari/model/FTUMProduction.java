@@ -1020,8 +1020,6 @@ public class FTUMProduction extends MProduction {
 		
 		int M_Warehouse_ID = finishedLocator.getM_Warehouse_ID();
 		
-		int asi = 0;
-		
 		MClient client = MClient.get(getCtx());
 		MProductCategory pc = MProductCategory.get(getCtx(),
 				finishedProduct.getM_Product_Category_ID());
@@ -1048,7 +1046,7 @@ public class FTUMProduction extends MProduction {
 
 					int loc = storages[sl].getM_Locator_ID();
 					int slASI = storages[sl].getM_AttributeSetInstance_ID();
-					int locAttribSet = new MAttributeSetInstance(getCtx(), asi,
+					int locAttribSet = new MAttributeSetInstance(getCtx(), slASI,
 							get_TrxName()).getM_AttributeSet_ID();
 
 					// roll up costing attributes if in the same locator
@@ -1126,9 +1124,10 @@ public class FTUMProduction extends MProduction {
 		int defaultLocator = 0;
 		
 		// products used in production
-		String sql = " SELECT M_ProductBom_ID, BOMQty, COALESCE(Scrap,0) as Scrap, C_UOM_ID,IsQtyPercentage FROM M_Product_BOM "
-				+ " WHERE M_Product_ID=" + finishedProduct.getM_Product_ID() + " AND isactive='Y' AND (AD_Org_ID = 0 OR AD_Org_ID = " + getAD_Org_ID() + ") "
-				+ " ORDER BY Line";
+		String sql = " SELECT pb.M_ProductBom_ID, pb.BOMQty, COALESCE(pb.Scrap,0) as Scrap, COALESCE(pb.C_UOM_ID,p.C_UOM_ID) as C_UOM_ID,pb.IsQtyPercentage FROM M_Product_BOM pb "
+				+ " JOIN M_Product p ON pb.M_Product_ID = p.M_Product_ID "
+				+ " WHERE pb.M_Product_ID=" + finishedProduct.getM_Product_ID() + " AND pb.IsActive='Y' AND (pb.AD_Org_ID = 0 OR pb.AD_Org_ID = " + getAD_Org_ID() + ") "
+				+ " ORDER BY pb.Line";
 
 		PreparedStatement pstmt = null;
 		ResultSet rs = null;
