@@ -1284,6 +1284,12 @@ public class MPPOrder extends X_PP_Order implements DocAction
 				obl.setQtyPlusScrap(parentQty);
 				obl.set_ValueOfColumn("IsRacking", PP_Product_BOMline.get_Value("IsRacking"));
 				obl.set_ValueOfColumn("IsDerivative", PP_Product_BOMline.get_Value("IsDerivative"));
+				if (product.getM_Locator_ID() > 0) {
+				MLocator LocatorFrom = MLocator.get(getCtx(), product.getM_Locator_ID());
+				MWarehouse WarehouseFrom = MWarehouse.get(getCtx(), LocatorFrom.getM_Warehouse_ID());
+				obl.set_ValueOfColumn("M_WarehouseSource_ID", WarehouseFrom.getM_Warehouse_ID());
+				obl.set_ValueOfColumn("M_LocatorFrom_ID", LocatorFrom.getM_Locator_ID());
+				}
 				obl.saveEx(get_TrxName()); 
 		 /*	DO NOT DO. LOW LEVEL requires each PP_Order to be handled separaete LEVEL to expand.
 				//iterate BOM children -- relegate to multiple PPOrder parent product tabs
