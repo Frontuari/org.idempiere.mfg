@@ -17,15 +17,20 @@
 package org.libero.process;
 
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.util.logging.Level;
 
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.exceptions.FillMandatoryException;
+import org.compiere.model.MAttributeSetInstance;
 import org.compiere.model.MDocType;
 import org.compiere.model.MMovement;
 import org.compiere.model.MMovementLine;
+import org.compiere.model.MProductCategory;
 import org.compiere.model.MQuery;
+import org.compiere.model.MStorageOnHand;
 import org.compiere.model.MTable;
 import org.compiere.model.PrintInfo;
 import org.compiere.print.MPrintFormat;
@@ -36,6 +41,8 @@ import org.compiere.process.ProcessInfoParameter;
 import org.compiere.process.SvrProcess;
 import org.libero.model.MPPOrder;
 import org.libero.model.MPPOrderBOMLine;
+
+import net.frontuari.model.FTUMProductionLine;
 
 /**
  * Complete & Print Manufacturing Order
@@ -223,6 +230,7 @@ implements ClientProcess
 						// crea una nueva cabezera 
 						MMovement m_movement = new MMovement(getCtx(), 0, get_TrxName());
 						m_movement.setAD_Org_ID(order.getAD_Org_ID());
+						m_movement.setAD_OrgTrx_ID(order.getAD_Org_ID());
 						m_movement.setMovementDate(new Timestamp(System.currentTimeMillis()));
 						m_movement.setC_DocType_ID(dt.get_ValueAsInt("C_DocTypeMovement_ID"));
 						m_movement.setIsApproved(false);
@@ -231,27 +239,113 @@ implements ClientProcess
 						
 						// guarda el objecto del movimiento
 						tmp_m_movement = m_movement;
+						//	Comprueba Stocks by ASI
+						MProductCategory pc = MProductCategory.get(getCtx(),
+								line.getM_Product().getM_Product_Category_ID());
+						String MMPolicy = pc.getMMPolicy();
+						MStorageOnHand[] storages = MStorageOnHand.getWarehouse(getCtx(), line.get_ValueAsInt("M_WarehouseSource_ID"), line.getM_Product_ID(), 0, null,
+								MProductCategory.MMPOLICY_FiFo.equals(MMPolicy), true, 0, get_TrxName());
 						
-						// crea una nueva linea 
-						MMovementLine m_movement_line = new MMovementLine(m_movement);
-						m_movement_line.setAD_Org_ID(line.getAD_Org_ID());
-						m_movement_line.setLine(line.getLine());
-						m_movement_line.setM_Product_ID(line.getM_Product_ID());
-						m_movement_line.setM_Locator_ID(line.get_ValueAsInt("M_LocatorFrom_ID"));
-						m_movement_line.setM_LocatorTo_ID(line.getM_Locator_ID());
-						m_movement_line.setMovementQty(line.getQtyRequired());
-						m_movement_line.saveEx(get_TrxName());
-						
+						BigDecimal MovementQty = line.getQtyRequired();
+						MMovementLine Line = null;
+						int prevLoc = -1;
+						int previousAttribSet = -1;
+						// Create lines from storage until qty is reached
+						for (int sl = 0; sl < storages.length; sl++) {
+							BigDecimal lineQty = storages[sl].getQtyOnHand();
+							if (lineQty.signum() != 0) {
+								if (lineQty.compareTo(MovementQty) > 0)
+									lineQty = MovementQty;
+
+								int loc = storages[sl].getM_Locator_ID();
+								int slASI = storages[sl].getM_AttributeSetInstance_ID();
+								int locAttribSet = new MAttributeSetInstance(getCtx(), slASI,
+										get_TrxName()).getM_AttributeSet_ID();
+
+								// roll up costing attributes if in the same locator
+								if (locAttribSet == 0 && previousAttribSet == 0
+										&& prevLoc == loc) {
+									Line.setMovementQty(line.getQtyRequired());
+									Line.saveEx(get_TrxName());
+								}
+								// otherwise create new line
+								else {
+									// crea una nueva linea 
+									Line = new MMovementLine(m_movement);
+									Line.setAD_Org_ID(line.getAD_Org_ID());
+									Line.setLine(line.getLine());
+									Line.setM_Product_ID(line.getM_Product_ID());
+									Line.setM_Locator_ID(line.get_ValueAsInt("M_LocatorFrom_ID"));
+									Line.setM_LocatorTo_ID(line.getM_Locator_ID());
+									Line.setMovementQty(line.getQtyRequired());
+									Line.saveEx(get_TrxName());
+									if (slASI != 0 && locAttribSet != 0)  // ie non costing attribute
+										Line.setM_AttributeSetInstance_ID(slASI);
+									Line.saveEx(get_TrxName());
+
+								}
+								prevLoc = loc;
+								previousAttribSet = locAttribSet;
+								// enough ?
+								MovementQty = MovementQty.subtract(lineQty);
+								if (MovementQty.signum() == 0)
+									break;
+							}
+						}
 					}else {
-						// si igual al anterior agrega una linea mas
-						MMovementLine m_movement_line = new MMovementLine(tmp_m_movement);
-						m_movement_line.setAD_Org_ID(line.getAD_Org_ID());
-						m_movement_line.setLine(line.getLine());
-						m_movement_line.setM_Product_ID(line.getM_Product_ID());
-						m_movement_line.setM_Locator_ID(line.get_ValueAsInt("M_LocatorFrom_ID"));
-						m_movement_line.setM_LocatorTo_ID(line.getM_Locator_ID());
-						m_movement_line.setMovementQty(line.getQtyRequired());
-						m_movement_line.saveEx(get_TrxName());	
+						//	Comprueba Stocks by ASI
+						MProductCategory pc = MProductCategory.get(getCtx(),
+								line.getM_Product().getM_Product_Category_ID());
+						String MMPolicy = pc.getMMPolicy();
+						MStorageOnHand[] storages = MStorageOnHand.getWarehouse(getCtx(), line.get_ValueAsInt("M_WarehouseSource_ID"), line.getM_Product_ID(), 0, null,
+								MProductCategory.MMPOLICY_FiFo.equals(MMPolicy), true, 0, get_TrxName());
+						
+						BigDecimal MovementQty = line.getQtyRequired();
+						MMovementLine Line = null;
+						int prevLoc = -1;
+						int previousAttribSet = -1;
+						// Create lines from storage until qty is reached
+						for (int sl = 0; sl < storages.length; sl++) {
+							BigDecimal lineQty = storages[sl].getQtyOnHand();
+							if (lineQty.signum() != 0) {
+								if (lineQty.compareTo(MovementQty) > 0)
+									lineQty = MovementQty;
+
+								int loc = storages[sl].getM_Locator_ID();
+								int slASI = storages[sl].getM_AttributeSetInstance_ID();
+								int locAttribSet = new MAttributeSetInstance(getCtx(), slASI,
+										get_TrxName()).getM_AttributeSet_ID();
+
+								// roll up costing attributes if in the same locator
+								if (locAttribSet == 0 && previousAttribSet == 0
+										&& prevLoc == loc) {
+									Line.setMovementQty(line.getQtyRequired());
+									Line.saveEx(get_TrxName());
+								}
+								// otherwise create new line
+								else {
+									// crea una nueva linea 
+									Line = new MMovementLine(tmp_m_movement);
+									Line.setAD_Org_ID(line.getAD_Org_ID());
+									Line.setLine(line.getLine());
+									Line.setM_Product_ID(line.getM_Product_ID());
+									Line.setM_Locator_ID(line.get_ValueAsInt("M_LocatorFrom_ID"));
+									Line.setM_LocatorTo_ID(line.getM_Locator_ID());
+									Line.setMovementQty(line.getQtyRequired());
+									Line.saveEx(get_TrxName());
+									if (slASI != 0 && locAttribSet != 0)  // ie non costing attribute
+										Line.setM_AttributeSetInstance_ID(slASI);
+									Line.saveEx(get_TrxName());
+
+								}
+								prevLoc = loc;
+								previousAttribSet = locAttribSet;
+								// enough ?
+								MovementQty = MovementQty.subtract(lineQty);
+								if (MovementQty.signum() == 0)
+									break;
+							}
+						}
 					}
 					//Enviar la misma orden de manufactura
 					if(!tmp_m_movement.processIt(MMovement.DOCACTION_Prepare))
