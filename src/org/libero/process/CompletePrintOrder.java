@@ -18,7 +18,6 @@ package org.libero.process;
 
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.util.logging.Level;
 
@@ -32,6 +31,7 @@ import org.compiere.model.MProductCategory;
 import org.compiere.model.MQuery;
 import org.compiere.model.MStorageOnHand;
 import org.compiere.model.MTable;
+import org.compiere.model.MWarehouse;
 import org.compiere.model.PrintInfo;
 import org.compiere.print.MPrintFormat;
 import org.compiere.print.ReportCtl;
@@ -41,8 +41,6 @@ import org.compiere.process.ProcessInfoParameter;
 import org.compiere.process.SvrProcess;
 import org.libero.model.MPPOrder;
 import org.libero.model.MPPOrderBOMLine;
-
-import net.frontuari.model.FTUMProductionLine;
 
 /**
  * Complete & Print Manufacturing Order
@@ -211,8 +209,8 @@ implements ClientProcess
 	 */
 	private void createMovement(MPPOrder order)
 	{
-		// Para guardar el anterior Localizador
-		int tmp_locator = 0;
+		// Para guardar el almacen anterior
+		int tmp_warehouse = 0;
 		/* Para guardar el anterior encabezado */
 		MMovement tmp_m_movement = null;
 		
@@ -221,9 +219,10 @@ implements ClientProcess
 			if(!line.get_ValueAsBoolean("IsDerivative") && !line.get_ValueAsBoolean("IsRacking")) {
 				
 				if(order.isProductWithInventory(line.getM_Product_ID(),order.get_ID())) {
-					
+					MWarehouse w = new MWarehouse(getCtx(), line.get_ValueAsInt("M_WarehouseSource_ID"), get_TrxName());
+					String IsManual = w.get_ValueAsString("IsManual");
 					// si es diferente del anterior crea una nueva cabezera...
-					if(tmp_locator != line.getM_Locator_ID()) {
+					if(tmp_warehouse != w.getM_Warehouse_ID()) {
 						//	get DocType
 						MDocType dt = new MDocType(getCtx(), order.getC_DocType_ID(), get_TrxName());
 						
@@ -235,6 +234,7 @@ implements ClientProcess
 						m_movement.setC_DocType_ID(dt.get_ValueAsInt("C_DocTypeMovement_ID"));
 						m_movement.setIsApproved(false);
 						m_movement.setIsInTransit(false);
+						m_movement.set_ValueOfColumn("IsManual", IsManual);
 						m_movement.saveEx(get_TrxName());
 						
 						// guarda el objecto del movimiento
@@ -356,7 +356,7 @@ implements ClientProcess
 					tmp_m_movement.set_ValueOfColumn("PP_Order_ID", order.get_ID());
 					tmp_m_movement.saveEx(get_TrxName());
 					
-					tmp_locator = line.getM_Locator_ID();
+					tmp_warehouse = w.getM_Warehouse_ID();
 			
 				}
 			}
