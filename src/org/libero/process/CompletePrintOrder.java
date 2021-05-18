@@ -220,7 +220,7 @@ implements ClientProcess
 				
 				if(order.isProductWithInventory(line.getM_Product_ID(),order.get_ID())) {
 					MWarehouse w = new MWarehouse(getCtx(), line.get_ValueAsInt("M_WarehouseSource_ID"), get_TrxName());
-					String IsManual = w.get_ValueAsString("IsManual");
+					boolean IsManual = w.get_ValueAsBoolean("IsManual");
 					// si es diferente del anterior crea una nueva cabezera...
 					if(tmp_warehouse != w.getM_Warehouse_ID()) {
 						//	get DocType
