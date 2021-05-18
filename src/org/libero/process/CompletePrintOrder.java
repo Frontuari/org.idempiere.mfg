@@ -348,7 +348,8 @@ implements ClientProcess
 						}
 					}
 					//Enviar la misma orden de manufactura
-					if(!tmp_m_movement.processIt(MMovement.DOCACTION_Prepare))
+					if(!tmp_m_movement.processIt(MMovement.DOCACTION_Prepare) 
+							&& !tmp_m_movement.get_ValueAsBoolean("IsManual"))
 					{
 						throw new AdempiereException(tmp_m_movement.getProcessMsg());
 					}
