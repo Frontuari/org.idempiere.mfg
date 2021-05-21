@@ -289,7 +289,7 @@ public class FTUMProduction extends MProduction {
 		// will not work if non-standard costing is used
 		if (MAcctSchema.COSTINGMETHOD_StandardCosting.equals(costingMethod))
 		{			
-			String sql = "SELECT ABS(((cc.currentcostprice-(SELECT SUM(c.currentcostprice*bom.qtybom)"
+			String sql = "SELECT ABS(((cc.currentcostprice-(SELECT SUM(c.currentcostprice*(CASE WHEN boml.IsQtyPercentage = 'Y' THEN 1 ELSE bom.ProductionQty END))"
 					+ " FROM m_cost c"
 					+ " INNER JOIN pp_product_bom bom ON (c.m_product_id=bom.m_product_id)"
 					+ " INNER JOIN pp_product_bomline boml ON (bom.pp_product_bom_id = boml.pp_product_bom_id ) "

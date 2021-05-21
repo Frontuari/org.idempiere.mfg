@@ -207,30 +207,12 @@ public class Doc_Transformation extends Doc_Production{
 			  DocLine line = p_lines[i];
 			  //	Calculate Costs
 			  BigDecimal costs = null;
-			X_M_ProductionLine prodLine = (X_M_ProductionLine)line.getPO();
+			  X_M_ProductionLine prodLine = (X_M_ProductionLine)line.getPO();
 				
 			  MCostDetail cd = MCostDetail.get (as.getCtx(), "M_ProductionLine_ID=?",
 					  prodLine.get_ID(), parentLine.getM_AttributeSetInstance_ID(), as.getC_AcctSchema_ID(), getTrxName());
 				if (cd != null) {
 					costs = cd.getAmt();
-					
-					/*
-					 //to coment
-					BigDecimal qtyUsed = prodLine.getQtyUsed();
-					if(qtyUsed.signum()==0){
-						costs = BigDecimal.ZERO;
-					}else if(qtyUsed.signum()<0 || qtyUsed.signum()>0){
-						if(parentLine.getM_Product_ID()==line.getM_Product_ID()){
-							costs = parentCosts;
-						}else {
-							//BigDecimal movementQty= prodLine.getMovementQty();
-							//BigDecimal factor = qtyUsed.divide(movementQty,curr.getCostingPrecision(), RoundingMode.HALF_UP);
-							costs = (unitParentCosts);//.divide(qtyUsed,8, RoundingMode.HALF_UP))
-							//.multiply(factor).setScale(curr.getCostingPrecision(), RoundingMode.HALF_UP);
-							costs = costs.multiply(qtyUsed).setScale(curr.getCostingPrecision(), RoundingMode.HALF_UP);
-						}
-					}//end to comment
-					*/
 				} else {
 											
 					BigDecimal qtyUsed = prodLine.getQtyUsed();
@@ -241,19 +223,13 @@ public class Doc_Transformation extends Doc_Production{
 						if(parentLine.getM_Product_ID()==line.getM_Product_ID()){
 							costs = parentCosts;
 						}else {
-							/*BigDecimal movementQty= prodLine.getMovementQty();
-							BigDecimal factor = qtyUsed.divide(movementQty,curr.getCostingPrecision(), RoundingMode.HALF_UP);*/
-							costs = (unitParentCosts);//.divide(qtyUsed,8, RoundingMode.HALF_UP))
-							//.multiply(factor).setScale(curr.getCostingPrecision(), RoundingMode.HALF_UP);
+							costs = (unitParentCosts);
 							costs = costs.multiply(qtyUsed).setScale(curr.getCostingPrecision(), RoundingMode.HALF_UP);
 						}
 					
 					}				
 					
 				}
-				
-					
-					
 				//  Inventory       DR      CR
 					fl = fact.createLine(line,
 						line.getAccount(ProductCost.ACCTTYPE_P_Asset, as),
