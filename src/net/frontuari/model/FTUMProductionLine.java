@@ -136,8 +136,7 @@ public class FTUMProductionLine extends MProductionLine {
 		
 		if (log.isLoggable(Level.FINEST))	log.log(Level.FINEST, "asi Description is: " + asiString);
 		// create transactions for finished goods
-		if ( getM_Product_ID() == getEndProduct_ID()
-				|| isEndProduct()) {
+		if (isEndProduct()) {
 			if (reversalId <= 0  && isAutoGenerateLot && getM_AttributeSetInstance_ID() == 0)
 			{
 				asi = MAttributeSetInstance.generateLot(getCtx(), (MProduct)getM_Product(), get_TrxName());
