@@ -57,6 +57,7 @@ implements ClientProcess
 	@SuppressWarnings("unused")
 	private boolean p_IsPrintPackList = false; // for future use
 	private boolean p_IsComplete = false;
+	private boolean p_IsBatch = false;
 
 	/**
 	 * Prepare - e.g., get Parameters.
@@ -76,7 +77,9 @@ implements ClientProcess
 			else if (name.equals("IsPrintPackingList"))
 				p_IsPrintPackList = para.getParameterAsBoolean();
 			else if (name.equals("IsComplete"))
-				p_IsComplete = para.getParameterAsBoolean(); 
+				p_IsComplete = para.getParameterAsBoolean();
+			else if (name.equals("IsBatch"))
+				p_IsBatch = para.getParameterAsBoolean();
 			else
 				log.log(Level.SEVERE, "prepare - Unknown Parameter: " + name);
 		}
@@ -221,6 +224,14 @@ implements ClientProcess
 				if(order.isProductWithInventory(line.getM_Product_ID(),order.get_ID())) {
 					MWarehouse w = new MWarehouse(getCtx(), line.get_ValueAsInt("M_WarehouseSource_ID"), get_TrxName());
 					boolean IsManual = w.get_ValueAsBoolean("IsManual");
+					
+					BigDecimal qtyBom = (BigDecimal) line.get_Value("QtyBOM");
+					BigDecimal MovementQty = BigDecimal.ZERO;
+					if(qtyBom != null && qtyBom.compareTo(BigDecimal.ZERO) != 0)
+						MovementQty = order.getQtyOrdered().multiply(qtyBom);
+					else
+						MovementQty = line.getQtyRequired();
+					
 					// si es diferente del anterior crea una nueva cabezera...
 					if(tmp_warehouse != w.getM_Warehouse_ID()) {
 						//	get DocType
@@ -239,20 +250,20 @@ implements ClientProcess
 						
 						// guarda el objecto del movimiento
 						tmp_m_movement = m_movement;
-						//	Comprueba Stocks by ASI
-						MProductCategory pc = MProductCategory.get(getCtx(),
-								line.getM_Product().getM_Product_Category_ID());
-						String MMPolicy = pc.getMMPolicy();
-						MStorageOnHand[] storages = MStorageOnHand.getWarehouse(getCtx(), line.get_ValueAsInt("M_WarehouseSource_ID"), line.getM_Product_ID(), 0, null,
-								MProductCategory.MMPOLICY_FiFo.equals(MMPolicy), true, 0, get_TrxName());
-						
-						BigDecimal MovementQty = line.getQtyRequired();
 						MMovementLine Line = null;
-						int prevLoc = -1;
-						int previousAttribSet = -1;
-						// Create lines from storage until qty is reached
-						if(!IsManual)
+						
+						if(p_IsBatch)
 						{
+							//	Comprueba Stocks by ASI
+							MProductCategory pc = MProductCategory.get(getCtx(),
+									line.getM_Product().getM_Product_Category_ID());
+							String MMPolicy = pc.getMMPolicy();
+							MStorageOnHand[] storages = MStorageOnHand.getWarehouse(getCtx(), line.get_ValueAsInt("M_WarehouseSource_ID"), line.getM_Product_ID(), 0, null,
+									MProductCategory.MMPOLICY_FiFo.equals(MMPolicy), true, 0, get_TrxName());
+							
+							int prevLoc = -1;
+							int previousAttribSet = -1;
+							// Create lines from storage until qty is reached
 							for (int sl = 0; sl < storages.length; sl++) {
 								BigDecimal lineQty = storages[sl].getQtyOnHand();
 								if (lineQty.signum() != 0) {
@@ -304,62 +315,76 @@ implements ClientProcess
 							Line.setM_Product_ID(line.getM_Product_ID());
 							Line.setM_Locator_ID(line.get_ValueAsInt("M_LocatorFrom_ID"));
 							Line.setM_LocatorTo_ID(line.getM_Locator_ID());
-							Line.setMovementQty(line.getQtyRequired());
+							Line.setMovementQty(MovementQty);
 							Line.saveEx(get_TrxName());
 						}
-					}else {
-						//	Comprueba Stocks by ASI
-						MProductCategory pc = MProductCategory.get(getCtx(),
-								line.getM_Product().getM_Product_Category_ID());
-						String MMPolicy = pc.getMMPolicy();
-						MStorageOnHand[] storages = MStorageOnHand.getWarehouse(getCtx(), line.get_ValueAsInt("M_WarehouseSource_ID"), line.getM_Product_ID(), 0, null,
-								MProductCategory.MMPOLICY_FiFo.equals(MMPolicy), true, 0, get_TrxName());
-						
-						BigDecimal MovementQty = line.getQtyRequired();
+					}else {						
 						MMovementLine Line = null;
-						int prevLoc = -1;
-						int previousAttribSet = -1;
-						// Create lines from storage until qty is reached
-						for (int sl = 0; sl < storages.length; sl++) {
-							BigDecimal lineQty = storages[sl].getQtyOnHand();
-							if (lineQty.signum() != 0) {
-								if (lineQty.compareTo(MovementQty) > 0)
-									lineQty = MovementQty;
+						if(p_IsBatch)
+						{
+							//	Comprueba Stocks by ASI
+							MProductCategory pc = MProductCategory.get(getCtx(),
+									line.getM_Product().getM_Product_Category_ID());
+							String MMPolicy = pc.getMMPolicy();
+							MStorageOnHand[] storages = MStorageOnHand.getWarehouse(getCtx(), line.get_ValueAsInt("M_WarehouseSource_ID"), line.getM_Product_ID(), 0, null,
+									MProductCategory.MMPOLICY_FiFo.equals(MMPolicy), true, 0, get_TrxName());
+							
+							int prevLoc = -1;
+							int previousAttribSet = -1;
+							// Create lines from storage until qty is reached
+							for (int sl = 0; sl < storages.length; sl++) {
+								BigDecimal lineQty = storages[sl].getQtyOnHand();
+								if (lineQty.signum() != 0) {
+									if (lineQty.compareTo(MovementQty) > 0)
+										lineQty = MovementQty;
 
-								int loc = storages[sl].getM_Locator_ID();
-								int slASI = storages[sl].getM_AttributeSetInstance_ID();
-								int locAttribSet = new MAttributeSetInstance(getCtx(), slASI,
-										get_TrxName()).getM_AttributeSet_ID();
+									int loc = storages[sl].getM_Locator_ID();
+									int slASI = storages[sl].getM_AttributeSetInstance_ID();
+									int locAttribSet = new MAttributeSetInstance(getCtx(), slASI,
+											get_TrxName()).getM_AttributeSet_ID();
 
-								// roll up costing attributes if in the same locator
-								if (locAttribSet == 0 && previousAttribSet == 0
-										&& prevLoc == loc) {
-									Line.setMovementQty(lineQty);
-									Line.saveEx(get_TrxName());
+									// roll up costing attributes if in the same locator
+									if (locAttribSet == 0 && previousAttribSet == 0
+											&& prevLoc == loc) {
+										Line.setMovementQty(lineQty);
+										Line.saveEx(get_TrxName());
+									}
+									// otherwise create new line
+									else {
+										// crea una nueva linea 
+										Line = new MMovementLine(tmp_m_movement);
+										Line.setAD_Org_ID(line.getAD_Org_ID());
+										Line.setLine(line.getLine());
+										Line.setM_Product_ID(line.getM_Product_ID());
+										Line.setM_Locator_ID(line.get_ValueAsInt("M_LocatorFrom_ID"));
+										Line.setM_LocatorTo_ID(line.getM_Locator_ID());
+										Line.setMovementQty(lineQty);
+										Line.saveEx(get_TrxName());
+										if (slASI != 0 && locAttribSet != 0)  // ie non costing attribute
+											Line.setM_AttributeSetInstance_ID(slASI);
+										Line.saveEx(get_TrxName());
+
+									}
+									prevLoc = loc;
+									previousAttribSet = locAttribSet;
+									// enough ?
+									MovementQty = MovementQty.subtract(lineQty);
+									if (MovementQty.signum() == 0)
+										break;
 								}
-								// otherwise create new line
-								else {
-									// crea una nueva linea 
-									Line = new MMovementLine(tmp_m_movement);
-									Line.setAD_Org_ID(line.getAD_Org_ID());
-									Line.setLine(line.getLine());
-									Line.setM_Product_ID(line.getM_Product_ID());
-									Line.setM_Locator_ID(line.get_ValueAsInt("M_LocatorFrom_ID"));
-									Line.setM_LocatorTo_ID(line.getM_Locator_ID());
-									Line.setMovementQty(lineQty);
-									Line.saveEx(get_TrxName());
-									if (slASI != 0 && locAttribSet != 0)  // ie non costing attribute
-										Line.setM_AttributeSetInstance_ID(slASI);
-									Line.saveEx(get_TrxName());
-
-								}
-								prevLoc = loc;
-								previousAttribSet = locAttribSet;
-								// enough ?
-								MovementQty = MovementQty.subtract(lineQty);
-								if (MovementQty.signum() == 0)
-									break;
 							}
+						}
+						else
+						{
+							// crea una nueva linea 
+							Line = new MMovementLine(tmp_m_movement);
+							Line.setAD_Org_ID(line.getAD_Org_ID());
+							Line.setLine(line.getLine());
+							Line.setM_Product_ID(line.getM_Product_ID());
+							Line.setM_Locator_ID(line.get_ValueAsInt("M_LocatorFrom_ID"));
+							Line.setM_LocatorTo_ID(line.getM_Locator_ID());
+							Line.setMovementQty(MovementQty);
+							Line.saveEx(get_TrxName());
 						}
 					}
 					//Enviar la misma orden de manufactura
