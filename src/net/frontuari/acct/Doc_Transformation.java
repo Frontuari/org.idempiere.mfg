@@ -90,6 +90,7 @@ public class Doc_Transformation extends Doc_Production{
 			while (rsPL.next())
 			{
 				X_M_ProductionLine line = new X_M_ProductionLine(getCtx(), rsPL, getTrxName());
+				
 				if (line.getMovementQty().signum() == 0)
 				{
 					if (log.isLoggable(Level.INFO)) log.info("LineQty=0 - " + line);
@@ -210,17 +211,22 @@ public class Doc_Transformation extends Doc_Production{
 			  X_M_ProductionLine prodLine = (X_M_ProductionLine)line.getPO();
 			  MProduct product = (MProduct) prodLine.getM_Product();
 			  String CostingMethod = product.getCostingMethod(as);
+			  BigDecimal lineNetAmt = (BigDecimal) prodLine.get_Value("LineNetAmt");
 			  
 			  MCostDetail cd = MCostDetail.get (as.getCtx(), "M_ProductionLine_ID=?",
 					  prodLine.get_ID(), parentLine.getM_AttributeSetInstance_ID(), as.getC_AcctSchema_ID(), getTrxName());
 			  if (cd != null) {
 					costs = cd.getAmt();
-			  } 
+			  }
+			  else if(lineNetAmt != null && lineNetAmt.compareTo(BigDecimal.ZERO) != 0)
+			  {
+				  costs = lineNetAmt;
+			  }
 			  else if(MAcctSchema.COSTINGMETHOD_StandardCosting.equals(CostingMethod))
 			  {
 				  costs = line.getProductCosts(as, line.getAD_Org_ID(), false);
 			  }
-			  else {							
+			  else {
 				BigDecimal qtyUsed = prodLine.getQtyUsed();
 				
 				if(qtyUsed.signum()==0){

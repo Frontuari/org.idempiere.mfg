@@ -14,14 +14,13 @@ import org.adempiere.base.event.AbstractEventHandler;
 import org.adempiere.base.event.IEventTopics;
 import org.adempiere.base.event.LoginEventData;
 import org.adempiere.exceptions.AdempiereException;
-import org.compiere.model.I_C_Order;
-import org.compiere.model.I_C_OrderLine;
 import org.compiere.model.I_M_Forecast;
 import org.compiere.model.I_M_ForecastLine;
 import org.compiere.model.I_M_InOut;
 import org.compiere.model.I_M_Movement;
 import org.compiere.model.I_M_Product;
 import org.compiere.model.I_M_Production;
+import org.compiere.model.I_M_ProductionLine;
 import org.compiere.model.I_M_Requisition;
 import org.compiere.model.I_M_RequisitionLine;
 import org.compiere.model.MForecastLine;
@@ -43,6 +42,7 @@ import org.compiere.model.Query;
 import org.compiere.model.X_M_Forecast;
 import org.compiere.process.DocAction;
 import org.compiere.util.CLogger;
+import org.compiere.util.DB;
 import org.compiere.util.Env;
 import org.compiere.util.Msg;
 import org.eevolution.model.MDDOrder;
@@ -61,6 +61,7 @@ import org.libero.tables.I_PP_Order_BOMLine;
 import org.osgi.service.event.Event;
 
 import net.frontuari.model.FTUMProduction;
+import net.frontuari.model.FTUMProductionLine;
 import net.frontuari.util.ProcessBuilder;
 
 /**
@@ -122,6 +123,8 @@ public class MFG_Validator extends AbstractEventHandler {
 		registerTableEvent(IEventTopics.DOC_AFTER_REVERSEACCRUAL, I_M_Production.Table_Name);
 		registerTableEvent(IEventTopics.DOC_AFTER_REVERSECORRECT, I_M_Production.Table_Name);
 		registerTableEvent(IEventTopics.DOC_AFTER_VOID, I_M_Production.Table_Name);
+		registerTableEvent(IEventTopics.PO_BEFORE_NEW, I_M_ProductionLine.Table_Name);
+		registerTableEvent(IEventTopics.PO_BEFORE_CHANGE, I_M_ProductionLine.Table_Name);
 		//End By Argenis Rodríguez
 		log.info("MFG MODEL VALIDATOR IS NOW INITIALIZED");
 	}
@@ -223,6 +226,42 @@ public class MFG_Validator extends AbstractEventHandler {
 				}
 			}
 			//End By Argenis Rodríguez
+			
+			//	Added by Jorge Colmenarez, 2021-05-26 08:04
+			//	Support for set PriceActual and LineNetAmt on ProductionLine
+			if(po instanceof FTUMProductionLine && (IEventTopics.PO_BEFORE_NEW == type 
+					|| IEventTopics.PO_BEFORE_CHANGE == type))
+			{
+				FTUMProductionLine pl = (FTUMProductionLine) po;
+				FTUMProduction p = new FTUMProduction(pl.getCtx(), pl.getM_Production_ID(), pl.get_TrxName());
+				
+				//	Check if Products it's Manual
+				if(p.get_ValueAsString("TrxType").equals("T"))
+				{
+					if(pl.get_ValueAsInt("MultiplyRate") == 0)
+						pl.set_ValueOfColumn("MultiplyRate", BigDecimal.ONE);
+				}
+				
+				if(p.get_ValueAsInt("M_PriceList_ID") > 0 && pl.isEndProduct())
+				{
+					//	Write PriceActual and LineNetAmt
+					String sql = "SELECT pp.PriceStd "
+							+ "FROM M_PriceList_Version plv "
+							+ "JOIN M_ProductPrice pp ON plv.M_PriceList_Version_ID = pp.M_PriceList_Version_ID "
+							+ "WHERE plv.M_PriceList_ID=? "						//	1
+							+ " AND plv.ValidFrom <= ? AND pp.M_Product_ID = ?"
+							+ "ORDER BY plv.ValidFrom DESC";
+					
+					BigDecimal price = DB.getSQLValueBD(pl.get_TrxName(), sql, new Object[] {p.get_ValueAsInt("M_PriceList_ID"),p.getMovementDate(), pl.getM_Product_ID()});
+					
+					if(price != null)
+					{
+						pl.set_ValueOfColumn("PriceActual", price);
+						pl.set_ValueOfColumn("LineNetAmt", price.multiply(pl.getMovementQty()));
+					}
+				}
+			}
+			//	End Jorge Colmenarez
 			
 			if (doc != null)
 			{
@@ -353,8 +392,7 @@ public class MFG_Validator extends AbstractEventHandler {
 			 po = getPO(event);
 			log.info(" topic="+event.getTopic()+" po="+po);
 			if (po.get_TableName().equals(I_M_Product.Table_Name)) {
- 				String msg = "TODO";
- 				logEvent(event, po, type);//log.fine("EVENT MANAGER // Product: PO_BEFORE_CHANGE >> MFG TODO 1 = '"+msg+"'");
+ 				logEvent(event, po, type);
 			}
 		}
 		if (po instanceof MInOut && type == IEventTopics.DOC_AFTER_COMPLETE)

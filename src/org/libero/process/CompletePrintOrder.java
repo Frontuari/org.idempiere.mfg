@@ -214,7 +214,7 @@ implements ClientProcess
 		/* Para guardar el anterior encabezado */
 		MMovement tmp_m_movement = null;
 		
-		for(MPPOrderBOMLine line : order.getLines()) {
+		for(MPPOrderBOMLine line : order.getLines(false)) {
 			
 			if(!line.get_ValueAsBoolean("IsDerivative") && !line.get_ValueAsBoolean("IsRacking")) {
 				
@@ -251,46 +251,61 @@ implements ClientProcess
 						int prevLoc = -1;
 						int previousAttribSet = -1;
 						// Create lines from storage until qty is reached
-						for (int sl = 0; sl < storages.length; sl++) {
-							BigDecimal lineQty = storages[sl].getQtyOnHand();
-							if (lineQty.signum() != 0) {
-								if (lineQty.compareTo(MovementQty) > 0)
-									lineQty = MovementQty;
+						if(!IsManual)
+						{
+							for (int sl = 0; sl < storages.length; sl++) {
+								BigDecimal lineQty = storages[sl].getQtyOnHand();
+								if (lineQty.signum() != 0) {
+									if (lineQty.compareTo(MovementQty) > 0)
+										lineQty = MovementQty;
 
-								int loc = storages[sl].getM_Locator_ID();
-								int slASI = storages[sl].getM_AttributeSetInstance_ID();
-								int locAttribSet = new MAttributeSetInstance(getCtx(), slASI,
-										get_TrxName()).getM_AttributeSet_ID();
+									int loc = storages[sl].getM_Locator_ID();
+									int slASI = storages[sl].getM_AttributeSetInstance_ID();
+									int locAttribSet = new MAttributeSetInstance(getCtx(), slASI,
+											get_TrxName()).getM_AttributeSet_ID();
 
-								// roll up costing attributes if in the same locator
-								if (locAttribSet == 0 && previousAttribSet == 0
-										&& prevLoc == loc) {
-									Line.setMovementQty(line.getQtyRequired());
-									Line.saveEx(get_TrxName());
+									// roll up costing attributes if in the same locator
+									if (locAttribSet == 0 && previousAttribSet == 0
+											&& prevLoc == loc) {
+										Line.setMovementQty(lineQty);
+										Line.saveEx(get_TrxName());
+									}
+									// otherwise create new line
+									else {
+										// crea una nueva linea 
+										Line = new MMovementLine(m_movement);
+										Line.setAD_Org_ID(line.getAD_Org_ID());
+										Line.setLine(line.getLine());
+										Line.setM_Product_ID(line.getM_Product_ID());
+										Line.setM_Locator_ID(line.get_ValueAsInt("M_LocatorFrom_ID"));
+										Line.setM_LocatorTo_ID(line.getM_Locator_ID());
+										Line.setMovementQty(lineQty);
+										Line.saveEx(get_TrxName());
+										if (slASI != 0 && locAttribSet != 0)  // ie non costing attribute
+											Line.setM_AttributeSetInstance_ID(slASI);
+										Line.saveEx(get_TrxName());
+
+									}
+									prevLoc = loc;
+									previousAttribSet = locAttribSet;
+									// enough ?
+									MovementQty = MovementQty.subtract(lineQty);
+									if (MovementQty.signum() == 0)
+										break;
 								}
-								// otherwise create new line
-								else {
-									// crea una nueva linea 
-									Line = new MMovementLine(m_movement);
-									Line.setAD_Org_ID(line.getAD_Org_ID());
-									Line.setLine(line.getLine());
-									Line.setM_Product_ID(line.getM_Product_ID());
-									Line.setM_Locator_ID(line.get_ValueAsInt("M_LocatorFrom_ID"));
-									Line.setM_LocatorTo_ID(line.getM_Locator_ID());
-									Line.setMovementQty(line.getQtyRequired());
-									Line.saveEx(get_TrxName());
-									if (slASI != 0 && locAttribSet != 0)  // ie non costing attribute
-										Line.setM_AttributeSetInstance_ID(slASI);
-									Line.saveEx(get_TrxName());
-
-								}
-								prevLoc = loc;
-								previousAttribSet = locAttribSet;
-								// enough ?
-								MovementQty = MovementQty.subtract(lineQty);
-								if (MovementQty.signum() == 0)
-									break;
 							}
+						}
+						else
+						{
+							// crea una nueva linea 
+							Line = new MMovementLine(m_movement);
+							Line.setAD_Org_ID(line.getAD_Org_ID());
+							Line.setLine(line.getLine());
+							Line.setM_Product_ID(line.getM_Product_ID());
+							Line.setM_Locator_ID(line.get_ValueAsInt("M_LocatorFrom_ID"));
+							Line.setM_LocatorTo_ID(line.getM_Locator_ID());
+							Line.setMovementQty(line.getQtyRequired());
+							Line.saveEx(get_TrxName());
 						}
 					}else {
 						//	Comprueba Stocks by ASI
@@ -319,7 +334,7 @@ implements ClientProcess
 								// roll up costing attributes if in the same locator
 								if (locAttribSet == 0 && previousAttribSet == 0
 										&& prevLoc == loc) {
-									Line.setMovementQty(line.getQtyRequired());
+									Line.setMovementQty(lineQty);
 									Line.saveEx(get_TrxName());
 								}
 								// otherwise create new line
@@ -331,7 +346,7 @@ implements ClientProcess
 									Line.setM_Product_ID(line.getM_Product_ID());
 									Line.setM_Locator_ID(line.get_ValueAsInt("M_LocatorFrom_ID"));
 									Line.setM_LocatorTo_ID(line.getM_Locator_ID());
-									Line.setMovementQty(line.getQtyRequired());
+									Line.setMovementQty(lineQty);
 									Line.saveEx(get_TrxName());
 									if (slASI != 0 && locAttribSet != 0)  // ie non costing attribute
 										Line.setM_AttributeSetInstance_ID(slASI);

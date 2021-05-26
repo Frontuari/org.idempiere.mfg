@@ -32,7 +32,6 @@ import org.compiere.model.MLocator;
 import org.compiere.model.MOrder;
 import org.compiere.model.MOrderLine;
 import org.compiere.model.MProduct;
-import org.compiere.model.MProduction;
 import org.compiere.model.MProject;
 import org.compiere.model.MResource;
 import org.compiere.model.MStorageOnHand;
@@ -356,8 +355,7 @@ public class MPPOrder extends X_PP_Order implements DocAction
 		String whereClause = MPPOrderBOMLine.COLUMNNAME_PP_Order_ID+"=?";
 		List<MPPOrderBOMLine> list = new Query(getCtx(), MPPOrderBOMLine.Table_Name, whereClause, get_TrxName())
 										.setParameters(new Object[]{getPP_Order_ID()})
-										//.setOrderBy(MPPOrderBOMLine.COLUMNNAME_Line)
-										.setOrderBy(MPPOrderBOMLine.COLUMNNAME_M_Locator_ID)
+										.setOrderBy("M_LocatorFrom_ID,M_Locator_ID")
 										.list();
 		m_lines = list.toArray(new MPPOrderBOMLine[list.size()]);
 		return m_lines;
@@ -1751,7 +1749,6 @@ public class MPPOrder extends X_PP_Order implements DocAction
 	private void createUsageVariance(I_PP_Order_BOMLine bomLine)
 	{
 		MPPOrder order = this;
-		Timestamp movementDate = order.getUpdated();
 		MPPOrderBOMLine line = (MPPOrderBOMLine)bomLine;
 
 		// If QtyBatch and QtyBOM is zero, than this is a method variance
@@ -1924,11 +1921,8 @@ public class MPPOrder extends X_PP_Order implements DocAction
 			{
 				int M_AttributeSetInstance_ID = 0;
 				KeyNamePair key = (KeyNamePair) issue[i][0].get(0);
-				Boolean isCritical = (Boolean) issue[i][0].get(1);
-				String value = (String)issue[i][0].get(2);
 				KeyNamePair productkey = (KeyNamePair) issue[i][0].get(3);			
 				int M_Product_ID = productkey.getKey();
-				MProduct product = MProduct.get(getCtx(),  M_Product_ID);
 				BigDecimal qtyToDeliver = (BigDecimal)issue[i][0].get(4);	
 				BigDecimal qtyScrapComponent = (BigDecimal) issue[i][0].get(5);	
 				
