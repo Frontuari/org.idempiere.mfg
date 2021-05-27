@@ -1067,6 +1067,10 @@ public class OrderReceiptIssue extends GenForm {
 				MPPOrderBOMLine[] lines = order.getLines(true,"M_Product_ID = "+productID);
 				//	Create Product Object
 				MProduct p = new MProduct(Env.getCtx(), productID, null);
+				//	Added by Jorge Colmenarez, 2021-05-27 08:07
+				//	Rounding qtyProduction
+				qtyLine = qtyLine.setScale(p.getC_UOM().getStdPrecision(), RoundingMode.HALF_UP);
+				//	End Jorge Colmenarez
 				
 				FTUMProductionLine mpl = new FTUMProductionLine(production);
 				 mpl.setAD_Org_ID(order.getAD_Org_ID());
