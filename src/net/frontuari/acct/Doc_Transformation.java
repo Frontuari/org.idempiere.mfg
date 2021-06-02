@@ -204,43 +204,43 @@ public class Doc_Transformation extends Doc_Production{
 		}
 		
 		for (int i = 0; i < p_lines.length; i++){
-		  if(isTransformation){
-			  DocLine line = p_lines[i];
-			  //	Calculate Costs
-			  BigDecimal costs = null;
-			  X_M_ProductionLine prodLine = (X_M_ProductionLine)line.getPO();
-			  MProduct product = (MProduct) prodLine.getM_Product();
-			  String CostingMethod = product.getCostingMethod(as);
-			  BigDecimal lineNetAmt = (BigDecimal) prodLine.get_Value("LineNetAmt");
-			  
-			  MCostDetail cd = MCostDetail.get (as.getCtx(), "M_ProductionLine_ID=?",
-					  prodLine.get_ID(), parentLine.getM_AttributeSetInstance_ID(), as.getC_AcctSchema_ID(), getTrxName());
-			  if (cd != null) {
-					costs = cd.getAmt();
-			  }
-			  else if(lineNetAmt != null && lineNetAmt.compareTo(BigDecimal.ZERO) != 0)
-			  {
-				  costs = lineNetAmt;
-			  }
-			  else if(MAcctSchema.COSTINGMETHOD_StandardCosting.equals(CostingMethod))
-			  {
-				  costs = line.getProductCosts(as, line.getAD_Org_ID(), false);
-			  }
-			  else {
-				BigDecimal qtyUsed = prodLine.getQtyUsed();
-				
-				if(qtyUsed.signum()==0){
-					costs = BigDecimal.ZERO;
-				}else if(qtyUsed.signum()<0 || qtyUsed.signum()>0){
-					if(parentLine.getM_Product_ID()==line.getM_Product_ID()){
-						costs = parentCosts;
-					}else {
-						costs = (unitParentCosts);
-						costs = costs.multiply(qtyUsed).setScale(curr.getCostingPrecision(), RoundingMode.HALF_UP);
+			if(isTransformation){
+				DocLine line = p_lines[i];
+				  //	Calculate Costs
+				  BigDecimal costs = null;
+				  X_M_ProductionLine prodLine = (X_M_ProductionLine)line.getPO();
+				  MProduct product = (MProduct) prodLine.getM_Product();
+				  String CostingMethod = product.getCostingMethod(as);
+				  BigDecimal lineNetAmt = (BigDecimal) prodLine.get_Value("LineNetAmt");
+				  
+				  MCostDetail cd = MCostDetail.get (as.getCtx(), "M_ProductionLine_ID=?",
+						  prodLine.get_ID(), parentLine.getM_AttributeSetInstance_ID(), as.getC_AcctSchema_ID(), getTrxName());
+				  if (cd != null) {
+						costs = cd.getAmt();
+				  }
+				  else if(lineNetAmt != null && lineNetAmt.compareTo(BigDecimal.ZERO) != 0)
+				  {
+					  costs = lineNetAmt;
+				  }
+				  else if(MAcctSchema.COSTINGMETHOD_StandardCosting.equals(CostingMethod))
+				  {
+					  costs = line.getProductCosts(as, line.getAD_Org_ID(), false);
+				  }
+				  else {
+					BigDecimal qtyUsed = prodLine.getQtyUsed();
+					
+					if(qtyUsed.signum()==0){
+						costs = BigDecimal.ZERO;
+					}else if(qtyUsed.signum()<0 || qtyUsed.signum()>0){
+						if(parentLine.getM_Product_ID()==line.getM_Product_ID()){
+							costs = parentCosts;
+						}else {
+							costs = (unitParentCosts);
+							costs = costs.multiply(qtyUsed).setScale(curr.getCostingPrecision(), RoundingMode.HALF_UP);
+						}
 					}
-				}
-			  }
-				//  Inventory       DR      CR
+				  }
+					//  Inventory       DR      CR
 				fl = fact.createLine(line,
 					line.getAccount(ProductCost.ACCTTYPE_P_Asset, as),
 					as.getC_Currency_ID(), costs);
@@ -251,7 +251,7 @@ public class Doc_Transformation extends Doc_Production{
 				}
 				fl.setM_Locator_ID(line.getM_Locator_ID());
 				fl.setQty(line.getQty());
-
+				
 				//	Cost Detail
 				String description = line.getDescription();
 				if (description == null)
@@ -266,7 +266,7 @@ public class Doc_Transformation extends Doc_Production{
 					p_Error = "Failed to create cost detail record";
 					return null;
 				}
-		  }else{
+			}else{
 			  
 			DocLine line = p_lines[i];
 			//	Calculate Costs
@@ -276,6 +276,9 @@ public class Doc_Transformation extends Doc_Production{
 			MProductionLineMA mas[] = MProductionLineMA.get(getCtx(), prodline.get_ID(), getTrxName());
 			MProduct product = (MProduct) prodline.getM_Product();
 			String CostingLevel = product.getCostingLevel(as);
+			
+			if(product.isPhantom())
+				continue;
 			
 			if (MAcctSchema.COSTINGLEVEL_BatchLot.equals(CostingLevel) ) 
 			{
