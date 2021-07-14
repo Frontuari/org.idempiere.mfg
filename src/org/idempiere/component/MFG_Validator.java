@@ -175,13 +175,18 @@ public class MFG_Validator extends AbstractEventHandler {
 							, production.get_ValueAsInt(X_PP_Order.COLUMNNAME_PP_Order_ID)
 							, production.get_TrxName());
 					
-					if (!order.processIt(MPPOrder.ACTION_Close))
-						throw new AdempiereException("Could not Close PP_Order [" + order.getProcessMsg() + "]");
-					
-					if (order.getDateFinish() == null)
-						order.setDateFinish(new Timestamp(System.currentTimeMillis()));
-					
-					order.saveEx();
+					BigDecimal difference = order.getQtyOrdered().subtract(order.getQtyDelivered()); 
+					//	PPOrder Qty Complete - Close It
+					if(difference.compareTo(BigDecimal.ZERO) <= 0)
+					{
+						if (!order.processIt(MPPOrder.ACTION_Close))
+							throw new AdempiereException("Could not Close PP_Order [" + order.getProcessMsg() + "]");
+						
+						if (order.getDateFinish() == null)
+							order.setDateFinish(new Timestamp(System.currentTimeMillis()));
+						
+						order.saveEx();
+					}
 				}
 			}
 			
@@ -350,8 +355,7 @@ public class MFG_Validator extends AbstractEventHandler {
 			 po = getPO(event);
 			log.info(" topic="+event.getTopic()+" po="+po);
 			if (po.get_TableName().equals(I_M_Product.Table_Name)) {
- 				String msg = "TODO";
- 				logEvent(event, po, type);//log.fine("EVENT MANAGER // Product: PO_BEFORE_CHANGE >> MFG TODO 1 = '"+msg+"'");
+ 				logEvent(event, po, type);
 			}
 		}
 		if (po instanceof MInOut && type == IEventTopics.DOC_AFTER_COMPLETE)

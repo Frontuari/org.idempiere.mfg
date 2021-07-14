@@ -39,7 +39,6 @@ import org.compiere.model.MLocator;
 import org.compiere.model.MOrder;
 import org.compiere.model.MOrderLine;
 import org.compiere.model.MProduct;
-import org.compiere.model.MRefList;
 import org.compiere.model.MRequisition;
 import org.compiere.model.MRequisitionLine;
 import org.compiere.model.MResource;
@@ -51,7 +50,6 @@ import org.compiere.process.DocAction;
 import org.compiere.util.CLogger;
 import org.compiere.util.DB;
 import org.compiere.util.Env;
-import org.compiere.util.Msg;
 import org.compiere.util.TimeUtil;
 import org.compiere.util.Util;
 import org.compiere.wf.MWorkflow;
@@ -60,7 +58,6 @@ import org.eevolution.model.MDDOrder;
 import org.eevolution.model.MDDOrderLine;
 import org.eevolution.model.MPPProductBOM;
 import org.eevolution.model.MPPProductPlanning;
-import org.libero.exceptions.NoPlantForWarehouseException;
 import org.libero.tables.X_PP_MRP;
 
 
@@ -859,7 +856,12 @@ public class MPPMRP extends X_PP_MRP implements DocAction
 			mrp = getQuery(ol, MPPMRP.TYPEMRP_Demand, MPPMRP.ORDERTYPE_SalesOrder).firstOnly();
 		}
 		else {
-			mrp = getQuery(ol, null, null).firstOnly();
+			//	Modified by Jorge Colmenarez, 2021-07-14 12:52
+			//	Prevent Exception Query Returns More That One Rows
+			//mrp = getQuery(ol, null, null).firstOnly();
+			int mrpID = DB.getSQLValue(ol.get_TrxName(), "SELECT MAX(PP_MRP_ID) FROM PP_MRP WHERE C_OrderLine_ID=?",ol.get_ID());
+			mrp = new MPPMRP(ol.getCtx(), mrpID, ol.get_TrxName());
+			//	End Jorge Colmenarez
 		}
 		//<--Ferry		
 		if(mrp == null)
