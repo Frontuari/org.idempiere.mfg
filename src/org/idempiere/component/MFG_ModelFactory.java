@@ -91,9 +91,9 @@ public class MFG_ModelFactory implements IModelFactory {
 		   } else if (tableName.equals(MDDOrderLine.Table_Name)) {
 			     return MDDOrderLine.class;
 
-		   } else if (tableName.equals(MOrder.Table_Name)) {
+		   } /*else if (tableName.equals(MOrder.Table_Name)) {
 			     return MOrder.class;
-		   } else if (tableName.equals(LiberoMovementLine.Table_Name)){
+		   } */else if (tableName.equals(LiberoMovementLine.Table_Name)){
 			   return LiberoMovementLine.class;
 		   } else if (tableName.equals(FTUMProduction.Table_Name)){
 			   return FTUMProduction.class;
@@ -177,9 +177,9 @@ public class MFG_ModelFactory implements IModelFactory {
 		   } else if (tableName.equals(MOrderLine.Table_Name)) {
 			     return new MOrderLine(Env.getCtx(), Record_ID, trxName);
 
-		   } else if (tableName.equals(MOrder.Table_Name)) {
+		   } /*else if (tableName.equals(MOrder.Table_Name)) {
 			     return new MOrder(Env.getCtx(), Record_ID, trxName);
-		   } else if (tableName.equals(LiberoMovementLine.Table_Name)){
+		   } */else if (tableName.equals(LiberoMovementLine.Table_Name)){
 			   return new LiberoMovementLine(Env.getCtx(), Record_ID, trxName);
 		   } else if (tableName.equals(FTUMProduction.Table_Name)){
 			   return new FTUMProduction(Env.getCtx(), Record_ID, trxName);
@@ -266,9 +266,9 @@ public class MFG_ModelFactory implements IModelFactory {
 		   } else if (tableName.equals(MOrderLine.Table_Name)) {
 			     return new MOrderLine(Env.getCtx(), rs, trxName);
 
-		   } else if (tableName.equals(MOrder.Table_Name)) {
+		   } /*else if (tableName.equals(MOrder.Table_Name)) {
 			     return new MOrder(Env.getCtx(), rs, trxName);
-		   } else if (tableName.equals(FTUMProduction.Table_Name)) {
+		   } */else if (tableName.equals(FTUMProduction.Table_Name)) {
 			     return new FTUMProduction(Env.getCtx(), rs, trxName);
 		   } else if (tableName.equals(FTUMProductionLine.Table_Name)) {
 			     return new FTUMProductionLine(Env.getCtx(), rs, trxName);
