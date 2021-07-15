@@ -17,6 +17,7 @@ import org.compiere.model.MAcctSchema;
 import org.compiere.model.MCostDetail;
 import org.compiere.model.MCurrency;
 import org.compiere.model.MFactAcct;
+import org.compiere.model.MPriceList;
 import org.compiere.model.MProduct;
 import org.compiere.model.MProductionLineMA;
 import org.compiere.model.ProductCost;
@@ -32,7 +33,6 @@ public class Doc_Transformation extends Doc_Production{
 
 	public Doc_Transformation(MAcctSchema as, ResultSet rs, String trxName) {
 		super(as, rs, trxName);
-		// TODO Auto-generated constructor stub
 	}
 	
 	/**
@@ -41,10 +41,19 @@ public class Doc_Transformation extends Doc_Production{
 	 */
 	protected String loadDocumentDetails()
 	{
-		setC_Currency_ID (NO_CURRENCY);
+		
 		X_M_Production prod = (X_M_Production)getPO();
 		setDateDoc (prod.getMovementDate());
 		setDateAcct(prod.getMovementDate());
+		
+		if(prod.get_ValueAsInt("M_PriceList_ID") > 0)
+		{
+			MPriceList pl = new MPriceList(getCtx(), prod.get_ValueAsInt("M_PriceList_ID"), prod.get_TrxName());
+			setC_Currency_ID (pl.getC_Currency_ID());
+		}
+		else
+			setC_Currency_ID (Env.getContextAsInt(getCtx(), "$C_Currency_ID"));
+		
 		//	Contained Objects
 		p_lines = loadLines(prod);
 		if (log.isLoggable(Level.FINE)) log.fine("Lines=" + p_lines.length);
@@ -171,11 +180,8 @@ public class Doc_Transformation extends Doc_Production{
 	public ArrayList<Fact> createFacts (MAcctSchema as)
 	{
 		//  create Fact Header
-		
-		
-		MCurrency curr = new MCurrency(getCtx(),Env.getContextAsInt(getCtx(), "$C_Currency_ID"),getTrxName());
+		MCurrency curr = new MCurrency(getCtx(),getC_Currency_ID(),getTrxName());
 		Fact fact = new Fact(this, as, Fact.POST_Actual);
-		setC_Currency_ID (as.getC_Currency_ID());
 
 		//  Line pointer
 		FactLine fl = null;
@@ -567,9 +573,9 @@ public class Doc_Transformation extends Doc_Production{
 
 				//  Amount
 				if (diff.signum() < 0)   //  negative balance => DR
-					line.setAmtSource(this.getC_Currency_ID(), diff.abs(), Env.ZERO);
+					line.setAmtSource(curr.getC_Currency_ID(), diff.abs(), Env.ZERO);
 				else                                //  positive balance => CR
-					line.setAmtSource(this.getC_Currency_ID(), Env.ZERO, diff);
+					line.setAmtSource(curr.getC_Currency_ID(), Env.ZERO, diff);
 					
 				//  Convert
 				line.convert();
@@ -594,5 +600,4 @@ public class Doc_Transformation extends Doc_Production{
 	//	log.fine("getSourceBalance - " + result.toString());
 		return result;
 	}	//	getSourceBalance
-
 }
