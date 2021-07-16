@@ -14,6 +14,7 @@ import org.compiere.acct.Doc_Production;
 import org.compiere.acct.Fact;
 import org.compiere.acct.FactLine;
 import org.compiere.model.MAcctSchema;
+import org.compiere.model.MConversionRate;
 import org.compiere.model.MCostDetail;
 import org.compiere.model.MCurrency;
 import org.compiere.model.MFactAcct;
@@ -226,7 +227,10 @@ public class Doc_Transformation extends Doc_Production{
 				  }
 				  else if(lineNetAmt != null && lineNetAmt.compareTo(BigDecimal.ZERO) != 0)
 				  {
-					  costs = lineNetAmt;
+					  if(curr.getC_Currency_ID() == as.getC_Currency_ID())
+						  costs = lineNetAmt;
+					  else
+						  costs = MConversionRate.convert(getCtx(), lineNetAmt, curr.getC_Currency_ID(), as.getC_Currency_ID(), getDateDoc(), 0, getAD_Client_ID(), getAD_Org_ID());
 				  }
 				  else if(MAcctSchema.COSTINGMETHOD_StandardCosting.equals(CostingMethod))
 				  {
